@@ -25,8 +25,14 @@ Keep changes focused and do not commit generated dependencies or local applicati
 
 ## Tests and pull requests
 
-Run the smallest focused check while developing, then run every repository verification command
-documented for the changed component. Always run:
+Run the smallest focused check while developing. Before opening a pull request, run the public,
+keyless repository gate:
+
+```powershell
+python tools/check.py
+```
+
+Also check the patch for whitespace errors:
 
 ```powershell
 git diff --check
