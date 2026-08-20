@@ -1,0 +1,43 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DSH Company fixture",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status", "service"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["healthy"]
+          },
+          "service": {
+            "type": "string",
+            "enum": ["dsh-company"]
+          }
+        }
+      }
+    }
+  }
+}

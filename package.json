@@ -10,6 +10,7 @@
     "test": "pnpm --filter @dsh/company-plugin test",
     "check": "pnpm run contracts:test && pnpm --filter @dsh/company-plugin check",
     "contracts:test": "node --test packages/contracts/tests/contract-tools.test.mjs",
+    "contracts:capture": "node packages/contracts/scripts/capture-company-service-openapi.mjs --output packages/contracts/openapi/openapi.json --revision-output packages/contracts/openapi/source-revision.json",
     "contracts:generate": "node packages/contracts/scripts/generate-types.mjs --input packages/contracts/openapi/openapi.json --output apps/dsh-company-plugin/src/contracts/generated/openapi.ts"
   },
   "devDependencies": { "openapi-typescript": "7.13.0" }
