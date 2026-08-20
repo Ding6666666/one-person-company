@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible problem in the public project.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve DSH Company.
+
+        **Public issue safety:** Never include API keys, private data, local databases, credentials, or other sensitive data. Remove or replace sensitive values before submitting.
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: Windows 11, Ubuntu 24.04, or similar
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: Output of python --version
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      placeholder: Output of node --version
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Provide the full commit SHA where the issue occurs.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: List the smallest sequence of public steps that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: redacted-logs
+    attributes:
+      label: Redacted logs
+      description: Paste only the minimum useful output after removing all sensitive data.
+      render: shell
+    validations:
+      required: false

@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a focused improvement to the public project.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Describe the need and intended outcome without sharing sensitive data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What limitation or need should this feature address?
+    validations:
+      required: true
+  - type: textarea
+    id: user-outcome
+    attributes:
+      label: User outcome
+      description: What should users be able to achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What alternatives have you considered?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included, and what is explicitly out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: security-data-impact
+    attributes:
+      label: Security and data impact
+      description: Explain changes to permissions, secrets, stored data, privacy, or external access. Write "None" when there is no impact.
+    validations:
+      required: true
