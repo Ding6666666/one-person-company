@@ -6,6 +6,13 @@ EmployeeId = NewType("EmployeeId", str)
 EmployeeRevisionId = NewType("EmployeeRevisionId", str)
 CapabilityGrantId = NewType("CapabilityGrantId", str)
 EmployeeAgentBindingId = NewType("EmployeeAgentBindingId", str)
+WorkId = NewType("WorkId", str)
+WorkGraphRevisionId = NewType("WorkGraphRevisionId", str)
+WorkNodeId = NewType("WorkNodeId", str)
+ExecutionLinkId = NewType("ExecutionLinkId", str)
+AttemptId = NewType("AttemptId", str)
+CompanyEventId = NewType("CompanyEventId", str)
+ArtifactReferenceId = NewType("ArtifactReferenceId", str)
 
 
 def new_id(prefix: str) -> str:
