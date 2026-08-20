@@ -56,6 +56,7 @@ def keyless_environment(source: Mapping[str, str] | None = None) -> dict[str, st
         if (value := available.get(name)) is not None
     }
     environment["CI"] = "true"
+    environment["DSH_RUNTIME_MODE"] = "node"
     return environment
 
 
@@ -77,6 +78,24 @@ def check_commands() -> list[tuple[str, ...]]:
         ),
         (uv, "run", "pyright"),
         (
+            pnpm,
+            "--dir",
+            "vendor/deepseek-harness",
+            "--config.verify-deps-before-run=warn",
+            "run",
+            "build:lib",
+        ),
+        (
+            pnpm,
+            "--dir",
+            "vendor/deepseek-harness",
+            "--config.verify-deps-before-run=warn",
+            "run",
+            "build:python-runtime",
+            "--node-only",
+            "--skip-build",
+        ),
+        (
             uv,
             "run",
             "pytest",
@@ -85,11 +104,11 @@ def check_commands() -> list[tuple[str, ...]]:
             "-q",
         ),
         (
-            pnpm,
-            "--dir",
-            "vendor/deepseek-harness",
+            uv,
             "run",
-            "build:lib",
+            "pytest",
+            "apps/company-service/tests/dsh_gateway",
+            "-q",
         ),
         (pnpm, "run", "check"),
     ]
