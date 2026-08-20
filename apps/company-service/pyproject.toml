@@ -5,12 +5,17 @@ description = "DSH Company local control service"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+  "deepseek-harness-sdk==0.0.0.dev0",
   "fastapi==0.141.1",
   "pydantic==2.12.5",
   "pydantic-settings==2.14.2",
   "structlog==25.5.0",
   "uvicorn==0.52.3",
 ]
+
+[tool.uv.sources]
+deepseek-harness-sdk = { path = "../../vendor/deepseek-harness/python/sdk", editable = true }
+deepseek-harness-runtime-bin = { path = "../../vendor/deepseek-harness/python/sdk-runtime", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.28,<2"]
