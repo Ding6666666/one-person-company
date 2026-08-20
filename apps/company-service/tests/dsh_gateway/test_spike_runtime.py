@@ -1,5 +1,19 @@
 from dsh_company.dsh_gateway.keyless_endpoint import KeylessModelEndpoint
-from dsh_company.dsh_gateway.spike_runtime import DshSpikeRuntime
+from dsh_company.dsh_gateway.spike_runtime import (
+    DshSpikeRuntime,
+    RecordingHarnessRuntime,
+)
+
+
+def test_attempt_cancel_is_harness_close_not_session_observe(tmp_path) -> None:
+    runtime = RecordingHarnessRuntime(tmp_path)
+    handle = runtime.start("employee-alpha", "wait for cancellation")
+
+    result = handle.cancel()
+
+    assert result.requested is True
+    assert result.runtime_closed is True
+    assert runtime.close_calls == 1
 
 
 def test_two_employee_sessions_execute_without_crossing_context(tmp_path, monkeypatch) -> None:

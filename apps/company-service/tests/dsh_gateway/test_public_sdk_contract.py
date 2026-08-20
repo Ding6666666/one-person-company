@@ -14,3 +14,10 @@ def test_current_public_sdk_exposes_the_session_boundary_we_use() -> None:
         "events",
         "notifications",
     }
+
+
+def test_public_sdk_does_not_claim_unavailable_surfaces() -> None:
+    assert not hasattr(DeepSeekHarness, "list_capabilities")
+    assert not hasattr(DeepSeekHarness, "observe")
+    assert not hasattr(Session, "cancel")
+    assert not hasattr(Session, "write_memory")
