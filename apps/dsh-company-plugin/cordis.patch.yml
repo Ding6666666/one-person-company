@@ -1,3 +1,8 @@
 - insert:
     - id: dsh-company
       name: '@dsh/company-plugin'
+      inject: [credentials]
+      config:
+        pythonPath: !!js process.env.DSH_COMPANY_PYTHON
+        serviceDirectory: !!js process.env.DSH_COMPANY_SERVICE_ROOT
+        dataRoot: !!js process.env.DSH_COMPANY_DATA_ROOT

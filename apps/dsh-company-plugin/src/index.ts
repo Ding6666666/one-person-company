@@ -1,8 +1,21 @@
-import type { Context } from '@deepseek-ai/cordis'
-
-export const name = 'dsh-company'
-export const inject: readonly string[] = []
-
-export function apply(_ctx: Context): void {}
-
-export default { name, inject, apply }
+export { default } from './host/service.js'
+export { resolveHostConfig, type Config, type ResolvedHostConfig } from './host/config.js'
+export {
+  CompanyHostLifecycle,
+  buildChildEnvironment,
+  reserveLoopbackPort,
+  type HostStatus,
+} from './host/lifecycle.js'
+export {
+  CompanyPluginService,
+  type CompanyPluginOptions,
+  type ManagedLifecycle,
+} from './host/plugin.js'
+export { createLoopbackTransport, type LoopbackTransport } from './remote.js'
+export type {
+  CompanyConnectionState,
+  CompanyRemoteNamespace,
+  CompanyRequestMethod,
+  CompanyRequestPath,
+  RemoteResult,
+} from './remote-contract.js'

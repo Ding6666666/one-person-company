@@ -29,11 +29,15 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
-    "@deepseek-ai/dsh-client-runtime": "*"
+    "@deepseek-ai/dsh-client-runtime": "*",
+    "@deepseek-ai/dsh-credentials": "*",
+    "@deepseek-ai/dsh-typert-protocol": "*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.1",
     "@deepseek-ai/dsh-client-runtime": "link:../../vendor/deepseek-harness/packages/client/runtime",
+    "@deepseek-ai/dsh-credentials": "link:../../vendor/deepseek-harness/packages/credentials/credentials",
+    "@deepseek-ai/dsh-typert-protocol": "link:../../vendor/deepseek-harness/packages/typert/protocol",
     "@types/node": "^22.20.0",
     "tsdown": "0.21.0",
     "typescript": "^5.9.3",

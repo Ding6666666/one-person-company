@@ -20,6 +20,12 @@ importers:
       '@deepseek-ai/dsh-client-runtime':
         specifier: link:../../vendor/deepseek-harness/packages/client/runtime
         version: link:../../vendor/deepseek-harness/packages/client/runtime
+      '@deepseek-ai/dsh-credentials':
+        specifier: link:../../vendor/deepseek-harness/packages/credentials/credentials
+        version: link:../../vendor/deepseek-harness/packages/credentials/credentials
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: link:../../vendor/deepseek-harness/packages/typert/protocol
+        version: link:../../vendor/deepseek-harness/packages/typert/protocol
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1

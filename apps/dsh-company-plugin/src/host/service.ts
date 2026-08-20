@@ -1,0 +1,55 @@
+import type { Context } from '@deepseek-ai/cordis'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+
+import type { Config } from './config.js'
+import { resolveHostConfig } from './config.js'
+import { CompanyHostLifecycle } from './lifecycle.js'
+import { CompanyPluginService } from './plugin.js'
+
+const CREDENTIAL_REF = credentialRef('DEEPSEEK_API_KEY')
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    company: CompanyHostService
+  }
+
+}
+
+export class CompanyHostService extends TypertRemoteService {
+  static inject = ['credentials']
+
+  private readonly product: CompanyPluginService
+
+  constructor(ctx: Context, config: Config) {
+    super(ctx, 'company')
+    const resolved = resolveHostConfig(config)
+    this.product = new CompanyPluginService({
+      resolveCredential: async () => (await ctx.credentials.resolve(CREDENTIAL_REF))?.value,
+      createLifecycle: credential => new CompanyHostLifecycle({
+        pythonPath: resolved.pythonPath,
+        serviceDirectory: resolved.serviceDirectory,
+        startupTimeoutMs: resolved.startupTimeoutSeconds * 1_000,
+        shutdownTimeoutMs: resolved.shutdownTimeoutSeconds * 1_000,
+        environment: resolved.environment,
+        ...(credential === undefined ? {} : { credential }),
+      }),
+    })
+    ctx.on('credentials/updated', ref => {
+      if (ref === CREDENTIAL_REF) return this.product.credentialUpdated()
+    })
+    ctx.effect(() => () => this.product.dispose(), 'dsh-company: dispose company service')
+  }
+
+  @Remote
+  connection() {
+    return this.product.connection()
+  }
+
+  @Remote
+  request(input: Parameters<CompanyPluginService['request']>[0]) {
+    return this.product.request(input)
+  }
+}
+
+export default CompanyHostService
