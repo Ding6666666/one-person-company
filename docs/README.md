@@ -11,7 +11,13 @@
 
 ## 实施计划
 
-1. [Phase 0：仓库与工程基础](superpowers/plans/2026-08-21-repository-foundation.md)：建立独立仓库、最小服务、DSH 插件双入口、OpenAPI 契约和公共门禁；不创建业务 Domain。
+1. [完整五阶段路线图](superpowers/plans/2026-08-21-complete-implementation-roadmap.md)：阶段依赖、跨阶段边界和产品级完成定义。
+2. [Phase 1A：仓库与工程基础](superpowers/plans/2026-08-21-repository-foundation.md)：独立仓库、最小服务、DSH 插件双入口、OpenAPI 契约和公共门禁。
+3. [Phase 1B：DSH 公共能力 Spike](superpowers/plans/2026-08-21-phase-1-dsh-capability-spike.md)：用真实 runtime 与 keyless endpoint 固定 Session、恢复、隔离和取消语义。
+4. [Phase 2：公司与员工核心](superpowers/plans/2026-08-21-phase-2-company-core.md)：Workspace、Employee、Revision、基础工具授权、持久化、API 与 UI。
+5. [Phase 3：Direct 工作闭环](superpowers/plans/2026-08-21-phase-3-direct-work.md)：单员工工作、DSH Gateway、历史、取消和重启恢复。
+6. [Phase 4：权限、审批与委派](superpowers/plans/2026-08-21-phase-4-governance.md)：四层授权、Approval、Delegation 和治理 UI。
+7. [Phase 5：Work Graph、评测与业务插件](superpowers/plans/2026-08-21-phase-5-work-graph-evaluation-and-plugins.md)：DurableGraphEngine、Star/Graph/Battle、MASEval 和插件边界。
 
 ## 当前状态
 

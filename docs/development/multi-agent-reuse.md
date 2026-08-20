@@ -95,33 +95,25 @@ port: adapt accessible UI primitives from multi-agent@2330adb
 
 ## 5. 建议实施顺序
 
-### 阶段 0：仓库与门禁
+### Phase 1：仓库基础与 DSH 公共能力
 
-建立 Python/Node workspace、许可证、贡献说明、contracts 生成、基础 CI 和检查命令。此阶段没有业务 Domain。
+先建立 Python/Node workspace、许可证、contracts、CI 和检查命令，再验证两个 Employee Session 的创建、事件、取消、重启恢复和上下文隔离。只有能力矩阵通过，EmployeeAgentBinding 和正式 Gateway 才进入产品实现。
 
-### 阶段 1：DSH 公共能力 Spike
+### Phase 2：公司与员工核心
 
-验证两个 Employee 的 Agent/Session 创建、事件、取消、重启恢复和 Memory 隔离。只有该 Spike 通过，EmployeeAgentBinding 和 DSH Gateway 才进入正式实现。
+实现 Workspace、Employee、EmployeeRevision、CapabilityGrant、EmployeeAgentBinding、SQLite 持久化、Host 生命周期、最小 API 和 UI。创建员工不启动 DSH，也不要求 provider credential。
 
-### 阶段 2：Company Foundation
+### Phase 3：Direct 工作闭环
 
-实现 Workspace、Employee、EmployeeRevision、CapabilityGrant、SQLite 持久化和最小 API；迁移通用 Host 生命周期与 UI Primitives。
+实现单节点 Work Graph、DSH Gateway、ExecutionLink、事件投影、结果引用、历史、取消与重启协调。Direct 是所有多员工策略的正确性与成本基线。
 
-### 阶段 3：Direct 闭环
+### Phase 4：权限、审批与委派
 
-实现单节点 Work、DSH Gateway、ExecutionLink、事件投影、结果引用和历史。Direct 是所有多员工策略的正确性与成本基线。
+实现 L0–L3 四层动作授权、资源范围、Approval、显式 Delegation 和不可变 Graph Revision。此阶段不需要 CrewAI 或动态图优化。
 
-### 阶段 4：权限、审批与委派
+### Phase 5：Work Graph、评测与业务插件
 
-实现 L0–L3 动作授权、资源范围、Approval 和显式 Delegation。此阶段不需要 CrewAI 或动态图优化。
-
-### 阶段 5：Work Graph 与 Battle
-
-实现 DurableGraphEngine、Graph Revision、Star/Graph/Battle 策略、失败协调和 MASEval Adapter。用公司任务集比较 Direct 与多员工策略。
-
-### 阶段 6：业务插件边界
-
-由第一个真实业务插件反推最小注册接口。软件开发能力继续在 `multi-agent` 保持可用，直到插件契约可以表达其需求，再单独制定迁移计划。
+实现 DurableGraphEngine、Star/Graph/Battle、失败协调、MASEval Adapter 和声明式业务插件边界。用固定公司任务集比较 Direct 与多员工策略，并用参考插件验证 Core 不被业务污染。
 
 ## 6. 迁移完成条件
 

@@ -1,10 +1,10 @@
-# DSH Company Phase 0 Repository Foundation Implementation Plan
+# DSH Company Phase 1A Repository Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 建立一个可在 Windows 与 Ubuntu 上重复安装、构建、测试和发布检查的独立 `dsh-company` 仓库，并交付可运行的 Company Service 健康端点、可构建的 DSH Host/Client 插件空壳和 Python/TypeScript OpenAPI 契约链路。
 
-**Architecture:** Phase 0 只建设工程地基，不创建 Workspace、Employee、Work、权限、编排、数据库表或业务页面。Python workspace 拥有最小 FastAPI 服务；TypeScript workspace 拥有可被 DSH 构建系统识别的双入口插件；OpenAPI 是两端传输契约。DSH 源码作为独立、固定提交的 vendor submodule 存在，`multi-agent` 只作为迁移来源，不成为运行时依赖。
+**Architecture:** Phase 1A 只建设工程地基，不创建 Workspace、Employee、Work、权限、编排、数据库表或业务页面。Python workspace 拥有最小 FastAPI 服务；TypeScript workspace 拥有可被 DSH 构建系统识别的双入口插件；OpenAPI 是两端传输契约。DSH 源码作为独立、固定提交的 vendor submodule 存在，`multi-agent` 只作为迁移来源，不成为运行时依赖。
 
 **Tech Stack:** Python 3.13、uv、FastAPI 0.141.1、Pydantic 2.12.5、Pytest 9.1.1、Ruff 0.15.4、Pyright 1.1.411；Node.js 22.19+、pnpm 11.7.0、TypeScript 5.9、tsdown 0.21、Vitest 4.1、OpenAPI TypeScript 7.13；GitHub Actions；Apache-2.0。
 
@@ -12,7 +12,7 @@
 
 ## 实施边界
 
-本计划是完整架构的第一个独立实施单元。后续按依赖顺序另写四份计划：DSH 公共能力 Spike、Company Foundation 与 Direct 闭环、权限/审批/委派、Work Graph/Battle/评测。后续计划必须使用本阶段真实生成的包、命令和 DSH 验证结果，不能提前假设 SDK 接口。
+本计划是完整架构 Phase 1 的第一个独立实施单元。完成后继续执行同目录下的 Phase 1B DSH 公共能力 Spike，再严格按完整路线图进入 Phase 2–5。后续计划必须使用本阶段真实生成的包、命令和 DSH 验证结果，不能提前假设 SDK 接口。
 
 迁移来源固定为：
 
@@ -232,7 +232,7 @@ uv lock
 uv sync --all-packages --all-groups
 ```
 
-Expected: both commands exit 0 and `uv.lock` records `dsh-company-service`; it must not contain `crewai`, `pycasbin`, `sqlalchemy` or `deepseek-harness-sdk` in Phase 0.
+Expected: both commands exit 0 and `uv.lock` records `dsh-company-service`; it must not contain `crewai`, `pycasbin`, `sqlalchemy` or `deepseek-harness-sdk` in Phase 1A.
 
 - [ ] **Step 2: 写出会失败的配置和健康检查测试**
 
@@ -941,7 +941,7 @@ python tools/check.py
 uv run uvicorn dsh_company.asgi:app --host 127.0.0.1 --port 8000
 ```
 
-`.env.example` contains only `DSH_COMPANY_HOST=127.0.0.1`, `DSH_COMPANY_PORT=8000` and `DSH_COMPANY_LOG_LEVEL=INFO`. It must not contain model/provider credentials because Phase 0 does not call DSH.
+`.env.example` contains only `DSH_COMPANY_HOST=127.0.0.1`, `DSH_COMPANY_PORT=8000` and `DSH_COMPANY_LOG_LEVEL=INFO`. It must not contain model/provider credentials because Phase 1A does not call DSH.
 
 `docs/development/contracts.md` must define: FastAPI owns schemas, committed OpenAPI is the transport snapshot, generated TypeScript is never hand-edited, capture records the API commit, compatibility changes require an explicit review. Link it from `docs/README.md`.
 
@@ -973,7 +973,7 @@ Run:
 rg -n "dsh_multi_agent|@dsh/multi-agent-plugin|crewai|worktree|Delivery" apps packages tools .github pyproject.toml package.json pnpm-workspace.yaml
 ```
 
-Expected: no matches. Any match means the Phase 0 implementation contains old业务耦合 and must be removed before proceeding.
+Expected: no matches. Any match means the Phase 1A implementation contains old业务耦合 and must be removed before proceeding.
 
 - [ ] **Step 4: 最终验证**
 
@@ -995,7 +995,7 @@ git add README.md docs .env.example
 git commit -m "docs: document repository foundation workflow"
 ```
 
-## Phase 0 完成定义
+## Phase 1A 完成定义
 
 只有以下事实全部成立，才能开始 DSH 公共能力 Spike：
 
