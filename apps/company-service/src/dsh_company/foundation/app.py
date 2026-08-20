@@ -1,10 +1,12 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from dsh_company.api.errors import install_error_handlers
-from dsh_company.foundation.assembly import ComponentAssembly
+from dsh_company.foundation.assembly import ComponentAssembly, create_production_assembly
 from dsh_company.foundation.config import Settings
 
 
@@ -17,8 +19,23 @@ def create_app(
     settings: Settings | None = None,
     assembly: ComponentAssembly | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="DSH Company Service", version="0.1.0")
-    app.state.settings = settings or Settings()
+    resolved_settings = settings or Settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        resolved_assembly = assembly or create_production_assembly(resolved_settings)
+        app.state.assembly = resolved_assembly
+        try:
+            yield
+        finally:
+            resolved_assembly.dispose()
+
+    app = FastAPI(
+        title="DSH Company Service",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
+    app.state.settings = resolved_settings
     app.state.assembly = assembly or ComponentAssembly()
     install_error_handlers(app)
 

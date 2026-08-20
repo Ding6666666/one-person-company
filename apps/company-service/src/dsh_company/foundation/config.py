@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    data_root: Path = Path("../dsh-company-data")
     dsh_provider: str = "deepseek-official"
     dsh_model: str = "deepseek-v4-flash"
     session_root: Path = Path("../dsh-company-data/sessions")

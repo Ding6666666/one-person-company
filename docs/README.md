@@ -26,6 +26,10 @@
 - 产品方向已经确认。
 - 系统架构、编排设计和代码复用策略已经确认。
 - Phase 1A 仓库与工程基础已实现并通过验收；Phase 1B DSH 公共能力 Spike 已实现，能力边界见固定矩阵。
+- Phase 2 Company Core 已实现 Workspace、Employee、不可变 Revision、能力授权、稳定 Binding、
+  SQLite 重启恢复、Workspace 隔离及管理 UI；创建流程完全本地，不需要 Provider 凭据且不启动 DSH。
+- 持久恢复的是 Company Core 事实。固定 DSH 公共 SDK 仍未公开 cold Session resume，稳定的
+  Employee Binding 不代表进程退出后可恢复 live DSH Session。
 - 原 `multi-agent` 仓库保持独立、可构建和可验证。
 
 ## 文档权威顺序

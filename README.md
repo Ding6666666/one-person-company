@@ -1,9 +1,9 @@
 # DSH Company
 
-DSH Company is an independent open-source project built on DSH. This repository currently
-contains the Phase 1A engineering foundation: a minimal Python service, a DSH plugin shell, and
-the committed API transport contract between them. Company Domain, persistence, DSH runtime
-integration, and business UI are not implemented yet.
+DSH Company is an independent open-source project built on DSH. The repository now contains the
+Phase 1 engineering foundation and public DSH capability evidence plus the Phase 2 Company Core:
+Workspace and Employee domain models, immutable Employee revisions, capability grants, stable DSH
+bindings, SQLite persistence, loopback APIs, and the management UI.
 
 ## Repository setup
 
@@ -37,8 +37,15 @@ Start the foundation service locally with:
 uv run uvicorn dsh_company.asgi:app --host 127.0.0.1 --port 8000
 ```
 
-The service currently exposes foundation endpoints such as `/health`; it does not provide
-Company Domain or DSH runtime behavior.
+The service exposes `/health` together with Workspace and Employee management endpoints. When the
+DSH Host starts it, Company data is stored in `company.db` beneath `DSH_COMPANY_DATA_ROOT` and is
+recovered after a service restart. Creating a Workspace or Employee is entirely local: it neither
+requires provider credentials nor starts DSH.
+
+The fixed public DSH SDK does not expose cold Session resume. Employee bindings therefore remain
+stable Company facts across restart, but they must not be interpreted as proof that a stopped DSH
+runtime can resume its former live Session. See the
+[DSH capability matrix](docs/development/dsh-capability-matrix.md) for the verified boundary.
 
 See [the documentation index](docs/README.md), [CONTRIBUTING.md](CONTRIBUTING.md) for contribution
 guidelines, and [SECURITY.md](SECURITY.md) for private vulnerability reporting. Licensed under the
