@@ -1,6 +1,6 @@
 # DSH Company 系统架构
 
-**状态：** 设计草案，2026-08-21，等待书面复核。
+**状态：** 设计已确认，2026-08-21，进入分阶段实施计划。
 
 本文定义第一阶段 Company Core 的组件、依赖方向、权威数据源和运行边界。产品语义以[产品方向](../product/one-person-company-product-direction.md)为准；工作图和评测细节见[图编排与评测](orchestration-and-evaluation.md)。
 

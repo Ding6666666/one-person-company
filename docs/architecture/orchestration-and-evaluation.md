@@ -1,6 +1,6 @@
 # Company Work Graph、编排与评测
 
-**状态：** 设计草案，2026-08-21，等待书面复核。
+**状态：** 设计已确认，2026-08-21，进入分阶段实施计划。
 
 本文定义 DSH Company 如何组织多名 Employee 完成工作，以及如何用 benchmark 决定具体编排实现。它不把 Company Core 变成另一套 Agent Runtime。
 

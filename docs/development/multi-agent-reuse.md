@@ -1,6 +1,6 @@
 # 从 `multi-agent` 选择性复用代码
 
-**状态：** 开发策略草案，2026-08-21，等待书面复核。
+**状态：** 开发策略已确认，2026-08-21，作为实施计划的迁移边界。
 
 本文规定如何从 `E:\Project\dsh\multi-agent` 高效复用已经验证的工程能力，同时避免把软件开发业务模型带入新的 Company Core。
 
@@ -14,6 +14,14 @@ feat: add employee quick-create dialog
 ```
 
 后续若从更新提交迁移，迁移提交必须记录新的来源 SHA。`dsh-company` 不通过 Git submodule、运行时包依赖或共享数据库依赖 `multi-agent`。
+
+DSH 公共接口与插件构建的初始 vendor 基线固定为：
+
+```text
+2db6ebd58523d14dca278e366ea0eb40499702b9
+```
+
+该提交将作为 `vendor/deepseek-harness` submodule 引入；它是 DSH 平台依赖，不是 `multi-agent` 业务代码依赖。升级 DSH 时必须在独立提交中更新 submodule，并重新执行 DSH 能力 Spike 与公共门禁。
 
 ## 2. 总体策略
 
