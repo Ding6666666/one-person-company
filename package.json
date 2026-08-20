@@ -1,0 +1,16 @@
+{
+  "name": "dsh-company-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+  "engines": { "node": ">=22.19.0", "pnpm": ">=11.0.0" },
+  "scripts": {
+    "build": "pnpm --filter @dsh/company-plugin build",
+    "typecheck": "pnpm --filter @dsh/company-plugin typecheck",
+    "test": "pnpm --filter @dsh/company-plugin test",
+    "check": "pnpm run contracts:test && pnpm --filter @dsh/company-plugin check",
+    "contracts:test": "node --test packages/contracts/tests/contract-tools.test.mjs",
+    "contracts:generate": "node packages/contracts/scripts/generate-types.mjs --input packages/contracts/openapi/openapi.json --output apps/dsh-company-plugin/src/contracts/generated/openapi.ts"
+  },
+  "devDependencies": { "openapi-typescript": "7.13.0" }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@dsh/company-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.mjs",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/types/index.d.ts", "default": "./dist/index.mjs" },
+    "./client": { "types": "./lib/types/client/index.d.ts", "default": "./dist/client.js" },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "lib/types/**/*.d.ts", "cordis.patch.yml"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-runtime"] }
+  },
+  "engines": { "node": ">=22.19.0", "pnpm": ">=11.0.0" },
+  "scripts": {
+    "build:types:host": "tsc -p tsconfig.host.json",
+    "build:host": "pnpm run build:types:host && tsdown --env.DSH_BUILD_FACE=host",
+    "build:types:client": "tsc -p tsconfig.client.json",
+    "build:client": "pnpm run build:types:client && tsdown --env.DSH_BUILD_FACE=client",
+    "build": "pnpm run build:host && pnpm run build:client",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "pnpm typecheck && pnpm build && pnpm test"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-client-runtime": "*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-client-runtime": "link:../../vendor/deepseek-harness/packages/client/runtime",
+    "@types/node": "^22.20.0",
+    "tsdown": "0.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.8"
+  }
+}
