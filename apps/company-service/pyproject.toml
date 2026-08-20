@@ -5,10 +5,12 @@ description = "DSH Company local control service"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+  "alembic==1.17.2",
   "deepseek-harness-sdk==0.0.0.dev0",
   "fastapi==0.141.1",
   "pydantic==2.12.5",
   "pydantic-settings==2.14.2",
+  "sqlalchemy==2.0.45",
   "structlog==25.5.0",
   "uvicorn==0.52.3",
 ]
