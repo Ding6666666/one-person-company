@@ -1,0 +1,56 @@
+.button {
+  border: 1px solid #52606d;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  color: #17202a;
+  cursor: pointer;
+  padding: 0.55rem 0.85rem;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid #8b98a5;
+  border-radius: 0.4rem;
+  font: inherit;
+  padding: 0.55rem;
+}
+
+.error {
+  color: #a61b1b;
+  font-size: 0.875rem;
+}
+
+.backdrop {
+  align-items: center;
+  background: rgb(15 23 42 / 58%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  pointer-events: auto;
+  position: fixed;
+  z-index: 1000;
+}
+
+.dialog {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 25%);
+  display: grid;
+  gap: 1rem;
+  max-height: 85vh;
+  max-width: 34rem;
+  overflow: auto;
+  padding: 1.5rem;
+  width: min(90vw, 34rem);
+}

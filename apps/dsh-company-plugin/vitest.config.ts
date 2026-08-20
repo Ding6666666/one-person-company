@@ -17,5 +17,5 @@ export default defineConfig({
       }).outputText
     },
   }],
-  test: { include: ['tests/**/*.spec.ts'], restoreMocks: true },
+  test: { include: ['tests/**/*.spec.{ts,tsx}'], restoreMocks: true },
 })

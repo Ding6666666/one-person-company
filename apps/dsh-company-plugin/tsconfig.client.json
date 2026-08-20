@@ -6,6 +6,6 @@
     "outDir": "./lib/types",
     "rootDir": "./src"
   },
-  "include": ["src/client/**/*.ts", "src/contracts/**/*.ts"],
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx", "src/contracts/**/*.ts"],
   "exclude": ["tests/**/*"]
 }

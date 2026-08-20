@@ -1,0 +1,32 @@
+.form {
+  display: grid;
+  gap: 1rem;
+}
+
+.defaults {
+  background: #f5f7fa;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.defaults ul {
+  margin-bottom: 0;
+}
+
+.grants,
+.grants fieldset {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.grants fieldset {
+  border: 1px solid #d7dee5;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}

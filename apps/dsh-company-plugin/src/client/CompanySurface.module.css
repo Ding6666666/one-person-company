@@ -1,0 +1,44 @@
+.overlay {
+  background: #fff;
+  color: #17202a;
+  display: grid;
+  inset: 0;
+  pointer-events: auto;
+  position: fixed;
+  z-index: 900;
+}
+
+.header {
+  align-items: center;
+  border-bottom: 1px solid #d7dee5;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+}
+
+.header h1 {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(13rem, 18rem) 1fr;
+  min-height: 0;
+  overflow: auto;
+}
+
+.dialogForm {
+  display: grid;
+  gap: 1rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 42rem) {
+  .layout { grid-template-columns: 1fr; }
+}

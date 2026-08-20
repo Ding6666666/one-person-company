@@ -1,0 +1,27 @@
+.panel {
+  border-right: 1px solid #d7dee5;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.list {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list a {
+  border-radius: 0.4rem;
+  color: #174ea6;
+  display: block;
+  padding: 0.5rem;
+  text-decoration: none;
+}
+
+.list a[aria-current='page'] {
+  background: #e8f0fe;
+  font-weight: 600;
+}

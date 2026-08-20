@@ -1,0 +1,15 @@
+.launcher {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.4rem;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.launcher:hover {
+  background: rgb(127 127 127 / 12%);
+}
