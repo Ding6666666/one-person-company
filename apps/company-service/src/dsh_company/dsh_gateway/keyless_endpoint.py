@@ -75,5 +75,9 @@ class KeylessModelEndpoint:
         port = self._server.server_address[1]
         return f"http://{host}:{port}"
 
+    @property
+    def requests(self) -> list[ModelRequest]:
+        return self._server.requests
+
     def request_for(self, marker: str) -> ModelRequest:
         return next(request for request in self._server.requests if request.marker == marker)
