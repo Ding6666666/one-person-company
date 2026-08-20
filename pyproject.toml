@@ -1,0 +1,40 @@
+[project]
+name = "dsh-company-workspace"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+dependencies = ["dsh-company-service"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/company-service"]
+
+[tool.uv.sources]
+dsh-company-service = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "httpx==0.28.1",
+  "pyright==1.1.411",
+  "pytest==9.1.1",
+  "ruff==0.15.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/company-service/tests", "tests/system/tests"]
+addopts = ["-ra"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pyright]
+include = ["apps/company-service/src", "apps/company-service/tests", "tests/system", "tools"]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+reportMissingTypeStubs = "none"
