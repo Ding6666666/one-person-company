@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from dsh_company.application.commands import CreateEmployee, CreateWorkspace, ReviseEmployee
+from dsh_company.application.company_service import CompanyService
 from dsh_company.domain.capabilities import default_employee_grants
 from dsh_company.domain.employee import Employee
 from dsh_company.domain.ids import EmployeeId, WorkspaceId
@@ -103,6 +105,45 @@ def test_workspace_boundary_filters_employee_queries(
         employees = uow.employees.list_for_workspace(WorkspaceId("ws-a"))
 
     assert [item.employee.id for item in employees] == [EmployeeId("emp-a")]
+
+
+def test_employee_revision_round_trip_preserves_binding(
+    sqlite_uow: SqlAlchemyUnitOfWork,
+) -> None:
+    service = CompanyService(sqlite_uow)
+    workspace = service.create_workspace(CreateWorkspace(name="Content company"))
+    created = service.create_employee(
+        CreateEmployee(
+            workspace_id=workspace.id,
+            display_name="Editor",
+            responsibility="Write",
+            runtime_profile="workspace_read",
+            model="deepseek-v4-flash",
+            grants=(),
+        )
+    )
+
+    revised = service.revise_employee(
+        ReviseEmployee(
+            employee_id=created.employee.id,
+            responsibility="Write and fact check",
+            runtime_profile="workspace_write",
+            model="deepseek-v4-flash",
+            grants=(),
+        )
+    )
+    with sqlite_uow as uow:
+        reloaded = uow.employees.get(created.employee.id)
+
+    assert reloaded == revised
+    assert reloaded is not None
+    assert reloaded.revision.revision_number == 2
+    assert reloaded.employee.current_revision_id == revised.revision.id
+    assert reloaded.binding == created.binding
+    assert all(
+        grant.employee_revision_id == revised.revision.id
+        for grant in reloaded.grants
+    )
 
 
 def test_uncommitted_unit_of_work_rolls_back(sqlite_uow: SqlAlchemyUnitOfWork) -> None:

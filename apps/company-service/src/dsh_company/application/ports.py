@@ -30,6 +30,8 @@ class WorkspaceRepository(Protocol):
 
     def get(self, workspace_id: WorkspaceId) -> Workspace | None: ...
 
+    def list(self) -> tuple[Workspace, ...]: ...
+
 
 class EmployeeRepository(Protocol):
     def add(
@@ -50,6 +52,7 @@ class EmployeeRepository(Protocol):
         self,
         employee: Employee,
         revision: EmployeeRevision,
+        binding: EmployeeAgentBinding,
         grants: tuple[CapabilityGrant, ...],
     ) -> None: ...
 

@@ -64,6 +64,19 @@ class WorkspaceRepository:
             created_at=_from_sqlite_utc(row.created_at),
         )
 
+    def list(self) -> tuple[Workspace, ...]:
+        rows = self._session.scalars(
+            select(WorkspaceRow).order_by(WorkspaceRow.created_at, WorkspaceRow.id)
+        )
+        return tuple(
+            Workspace(
+                id=WorkspaceId(row.id),
+                name=row.name,
+                created_at=_from_sqlite_utc(row.created_at),
+            )
+            for row in rows
+        )
+
 
 class EmployeeRepository:
     def __init__(self, session: Session) -> None:
@@ -133,6 +146,42 @@ class EmployeeRepository:
             .order_by(EmployeeRow.created_at, EmployeeRow.id)
         )
         return tuple(self._record(row) for row in rows)
+
+    def revise(
+        self,
+        employee: Employee,
+        revision: EmployeeRevision,
+        binding: EmployeeAgentBinding,
+        grants: tuple[CapabilityGrant, ...],
+    ) -> None:
+        employee_row = self._session.get(EmployeeRow, employee.id)
+        if employee_row is None:
+            raise LookupError("employee not found")
+        revision_row = EmployeeRevisionRow(
+            id=revision.id,
+            employee_id=revision.employee_id,
+            revision_number=revision.revision_number,
+            responsibility=revision.responsibility,
+            runtime_profile=revision.runtime_profile,
+            model=revision.model,
+            created_at=revision.created_at,
+            employee=employee_row,
+        )
+        grant_rows = [
+            CapabilityGrantRow(
+                id=grant.id,
+                employee_revision_id=grant.employee_revision_id or revision.id,
+                action=grant.action,
+                level=int(grant.level),
+                resource_kind=grant.resource_kind,
+                resource_values_json=json.dumps(grant.resource_values, ensure_ascii=False),
+                requires_approval=grant.requires_approval,
+                revision=revision_row,
+            )
+            for grant in grants
+        ]
+        employee_row.current_revision_id = revision.id
+        self._session.add_all([revision_row, *grant_rows])
 
     def _record(self, employee_row: EmployeeRow) -> EmployeeRecord:
         revision_row = self._session.get(

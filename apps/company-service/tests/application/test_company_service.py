@@ -34,6 +34,9 @@ class FakeWorkspaceRepository:
     def get(self, workspace_id: WorkspaceId) -> Workspace | None:
         return self.items.get(workspace_id)
 
+    def list(self) -> tuple[Workspace, ...]:
+        return tuple(self.items.values())
+
 
 class FakeEmployeeRepository:
     def __init__(self) -> None:
@@ -65,14 +68,14 @@ class FakeEmployeeRepository:
         self,
         employee: Employee,
         revision: EmployeeRevision,
+        binding: EmployeeAgentBinding,
         grants: tuple[CapabilityGrant, ...],
     ) -> None:
-        current = self.items[employee.id]
         self.revisions[employee.id].append(revision)
         self.items[employee.id] = EmployeeRecord(
             employee,
             revision,
-            current.binding,
+            binding,
             grants,
         )
 
@@ -234,3 +237,13 @@ def test_queries_preserve_workspace_boundary(fake_uow: FakeUnitOfWork) -> None:
     assert service.list_employees(first.id) == (employee,)
     assert service.list_employees(second.id) == ()
     assert service.get_employee(employee.employee.id) == employee
+
+
+def test_list_workspaces_returns_created_workspaces(
+    fake_uow: FakeUnitOfWork,
+) -> None:
+    service = CompanyService(fake_uow, id_factory=SequentialIds())
+    first = service.create_workspace(CreateWorkspace(name="First"))
+    second = service.create_workspace(CreateWorkspace(name="Second"))
+
+    assert service.list_workspaces() == (first, second)

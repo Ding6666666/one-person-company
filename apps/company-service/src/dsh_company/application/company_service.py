@@ -70,7 +70,7 @@ class CompanyService:
             grants = self._grant_snapshot(
                 employee.workspace_id, revision.id, command.grants
             )
-            uow.employees.revise(employee, revision, grants)
+            uow.employees.revise(employee, revision, current.binding, grants)
             uow.commit()
             record = uow.employees.get(employee.id)
         if record is None:
@@ -83,6 +83,10 @@ class CompanyService:
         if workspace is None:
             raise LookupError("workspace not found")
         return workspace
+
+    def list_workspaces(self) -> tuple[Workspace, ...]:
+        with self._uow as uow:
+            return uow.workspaces.list()
 
     def list_employees(self, workspace_id: WorkspaceId) -> tuple[EmployeeRecord, ...]:
         with self._uow as uow:
