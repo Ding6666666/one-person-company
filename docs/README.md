@@ -8,6 +8,7 @@
 2. [系统架构](architecture/system.md)：定义 Company Core、DSH、Memory Provider 和业务插件的职责与权威数据源。
 3. [图编排与评测](architecture/orchestration-and-evaluation.md)：定义 Company Work Graph、可替换编排引擎、DSH Gateway 和 benchmark 驱动的框架选择。
 4. [`multi-agent` 代码复用策略](development/multi-agent-reuse.md)：定义哪些代码迁移、哪些只参考、哪些保留为软件开发插件。
+5. [API 契约开发规则](development/contracts.md)：定义 schema 所有权、OpenAPI 快照、TypeScript 生成代码和兼容性审查要求。
 
 ## 实施计划
 
@@ -23,7 +24,7 @@
 
 - 产品方向已经确认。
 - 系统架构、编排设计和代码复用策略已经确认。
-- `dsh-company` 已进入分阶段实施计划编写；业务实现仍须按已确认边界和对应计划推进。
+- Phase 1A 仓库与工程基础已实现并通过验收；Phase 1B DSH 公共能力 Spike 是下一阶段，尚未实现。
 - 原 `multi-agent` 仓库保持独立、可构建和可验证。
 
 ## 文档权威顺序
