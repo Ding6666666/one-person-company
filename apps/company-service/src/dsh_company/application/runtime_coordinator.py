@@ -50,8 +50,10 @@ class RuntimeCoordinator:
             thread_name_prefix="dsh-company-runtime",
         )
         self._lifecycle_lock = Lock()
+        self._shutdown_lock = Lock()
         self._accepting = True
         self._started = False
+        self._shutdown_started = False
         self._node_locks_lock = Lock()
         self._node_locks: dict[WorkNodeId, Lock] = {}
 
@@ -63,8 +65,11 @@ class RuntimeCoordinator:
 
     def dispatch(self, node_id: WorkNodeId) -> None:
         node_lock = self._node_lock(node_id)
-        with node_lock:
-            prepared = self._mark_running(node_id)
+        with self._lifecycle_lock:
+            if not self._accepting:
+                return
+            with node_lock:
+                prepared = self._mark_running(node_id)
         if prepared is None:
             return
         aggregate, submission = prepared
@@ -90,12 +95,20 @@ class RuntimeCoordinator:
             return
 
         with node_lock:
-            self._complete_if_running(
-                node_id,
-                submission.attempt_id,
-                reference_uri=result.reference_uri,
-                source_sequence=max(result.event_count, highest_event_sequence) + 1,
-            )
+            source_sequence = max(result.event_count, highest_event_sequence) + 1
+            if result.finish_reason == "completed":
+                self._complete_if_running(
+                    node_id,
+                    submission.attempt_id,
+                    reference_uri=result.reference_uri,
+                    source_sequence=source_sequence,
+                )
+            else:
+                self._fail_if_running(
+                    node_id,
+                    submission.attempt_id,
+                    source_sequence=source_sequence,
+                )
 
     def request_cancel(self, node_id: WorkNodeId) -> None:
         node_lock = self._node_lock(node_id)
@@ -202,9 +215,20 @@ class RuntimeCoordinator:
             self.enqueue(node_id)
 
     def shutdown(self, *, wait: bool = True) -> None:
-        with self._lifecycle_lock:
-            self._accepting = False
-        self._executor.shutdown(wait=wait, cancel_futures=False)
+        with self._shutdown_lock:
+            with self._lifecycle_lock:
+                if not self._shutdown_started:
+                    self._shutdown_started = True
+                    self._accepting = False
+                    self._executor.shutdown(wait=False, cancel_futures=True)
+                    close_gateway = True
+                else:
+                    close_gateway = False
+            try:
+                if close_gateway:
+                    self._gateway.shutdown()
+            finally:
+                self._executor.shutdown(wait=wait, cancel_futures=True)
 
     def _mark_running(
         self, node_id: WorkNodeId

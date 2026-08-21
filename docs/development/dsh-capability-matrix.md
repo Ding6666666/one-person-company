@@ -51,6 +51,9 @@ Employee 的 marker。该结果不代表进程退出后可以恢复 Session。
   解释为已恢复或已完成。
 - employee continuity uses the persistent DSH `Session` 仅限 live runtime 与上述已支持范围；
   当前公开接口不保证 cold restart continuity。
+- Direct Work 的每个 Attempt 按已验证取消语义关闭其 Harness。当前固定 SDK 对同一稳定
+  Session ID 的下一个 Attempt 在第二次模型请求前返回 `error`（没有新的模型请求）；Company
+  将其记录为 `failed/gateway_error`。这是真实限制，不是 cold resume 或持久 Memory 的证据。
 - Company Core does not implement a substitute memory store；Memory Provider API 未公开时记录
   真实限制。
 - runtime profiles are checked-in capability catalogs until DSH exposes discovery；这些目录是

@@ -293,3 +293,14 @@ def test_cancel_unknown_attempt_does_not_close_another_harness(tmp_path: Path) -
 
     assert result.runtime_closed is False
     assert factory.close_calls == ["attempt-1"]
+
+
+def test_shutdown_barrier_rejects_new_harness_creation(tmp_path: Path) -> None:
+    factory = FakeHarnessFactory()
+    gateway = make_gateway(factory, tmp_path)
+
+    gateway.shutdown()
+
+    with pytest.raises(RuntimeError, match="shutting down"):
+        gateway.submit(submission(), on_event=lambda event: None)
+    assert factory.create_calls == 0

@@ -26,6 +26,7 @@ def create_app(
         resolved_assembly = assembly or create_production_assembly(resolved_settings)
         app.state.assembly = resolved_assembly
         try:
+            resolved_assembly.startup()
             yield
         finally:
             resolved_assembly.dispose()

@@ -39,9 +39,12 @@ class RuntimeSupervisor:
     def __init__(self) -> None:
         self._lock = Lock()
         self._active: dict[AttemptId, _AttemptHandle] = {}
+        self._closing = False
 
     def register(self, attempt_id: AttemptId, harness: ClosableHarness) -> None:
         with self._lock:
+            if self._closing:
+                raise RuntimeError("runtime supervisor is shutting down")
             if attempt_id in self._active:
                 raise ValueError(f"attempt {attempt_id} is already active")
             self._active[attempt_id] = _AttemptHandle(harness)
@@ -50,6 +53,8 @@ class RuntimeSupervisor:
         self, attempt_id: AttemptId, harness_factory: Callable[[], HarnessT]
     ) -> HarnessT:
         with self._lock:
+            if self._closing:
+                raise RuntimeError("runtime supervisor is shutting down")
             if attempt_id in self._active:
                 raise ValueError(f"attempt {attempt_id} is already active")
             harness = harness_factory()
@@ -78,3 +83,17 @@ class RuntimeSupervisor:
     def is_active(self, attempt_id: AttemptId) -> bool:
         with self._lock:
             return attempt_id in self._active
+
+    def close_all(self) -> None:
+        with self._lock:
+            self._closing = True
+            handles = tuple(self._active.values())
+        first_error: BaseException | None = None
+        for handle in handles:
+            try:
+                handle.close_once()
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+        if first_error is not None:
+            raise first_error

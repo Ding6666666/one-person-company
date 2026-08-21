@@ -6,7 +6,9 @@ from fastapi import APIRouter
 from dsh_company.api.company import router as company_router
 from dsh_company.api.work import router as work_router
 from dsh_company.application.ports import WorkCoordinator, WorkUnitOfWork
+from dsh_company.application.runtime_coordinator import RuntimeCoordinator
 from dsh_company.domain.ids import WorkNodeId
+from dsh_company.dsh_gateway.adapter import PublicSdkDshGateway
 from dsh_company.foundation.config import Settings
 from dsh_company.persistence.database import create_sqlite_engine, create_tables
 from dsh_company.persistence.uow import SqlAlchemyUnitOfWork
@@ -40,22 +42,56 @@ def _company_router() -> APIRouter:
 @dataclass(frozen=True, slots=True)
 class ComponentAssembly:
     uow_factory: Callable[[], WorkUnitOfWork] = _unconfigured_uow
-    work_coordinator: WorkCoordinator = field(
-        default_factory=_UnconfiguredWorkCoordinator
-    )
+    work_coordinator: WorkCoordinator = field(default_factory=_UnconfiguredWorkCoordinator)
     router: APIRouter = field(default_factory=_company_router)
+    startup: Callable[[], None] = _noop
     dispose: Callable[[], None] = _noop
 
 
 def create_production_assembly(settings: Settings) -> ComponentAssembly:
     settings.data_root.mkdir(parents=True, exist_ok=True)
+    session_root = settings.resolved_session_root
+    workspace_root = settings.resolved_workspace_root
+    session_root.mkdir(parents=True, exist_ok=True)
+    workspace_root.mkdir(parents=True, exist_ok=True)
     engine = create_sqlite_engine(settings.data_root / "company.db")
     try:
         create_tables(engine)
+        gateway = PublicSdkDshGateway(
+            session_root=session_root,
+            working_directory=workspace_root,
+            provider=settings.dsh_provider,
+            base_url=settings.dsh_base_url,
+            api_key=(
+                None
+                if settings.deepseek_api_key is None
+                else settings.deepseek_api_key.get_secret_value()
+            ),
+            request_timeout_seconds=settings.dsh_request_timeout_seconds,
+            shutdown_timeout_seconds=settings.dsh_shutdown_timeout_seconds,
+        )
+
+        def uow_factory() -> SqlAlchemyUnitOfWork:
+            return SqlAlchemyUnitOfWork(engine)
+
+        coordinator = RuntimeCoordinator(
+            uow_factory,
+            gateway,
+            runtime_concurrency=settings.runtime_concurrency,
+        )
     except BaseException:
         engine.dispose()
         raise
+
+    def dispose() -> None:
+        try:
+            coordinator.shutdown(wait=True)
+        finally:
+            engine.dispose()
+
     return ComponentAssembly(
-        uow_factory=lambda: SqlAlchemyUnitOfWork(engine),
-        dispose=engine.dispose,
+        uow_factory=uow_factory,
+        work_coordinator=coordinator,
+        startup=coordinator.start,
+        dispose=dispose,
     )

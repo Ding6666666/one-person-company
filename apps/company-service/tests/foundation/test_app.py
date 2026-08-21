@@ -75,3 +75,32 @@ def test_injected_assembly_disposes_after_request_failure() -> None:
             client.get("/workspaces")
 
     dispose.assert_called_once_with()
+
+
+def test_assembly_starts_before_requests_and_disposes_after_lifespan() -> None:
+    lifecycle: list[str] = []
+    assembly = ComponentAssembly(
+        startup=lambda: lifecycle.append("started"),
+        dispose=lambda: lifecycle.append("disposed"),
+    )
+
+    with TestClient(create_app(assembly=assembly)) as client:
+        assert lifecycle == ["started"]
+        client.get("/health").raise_for_status()
+
+    assert lifecycle == ["started", "disposed"]
+
+
+def test_startup_failure_still_disposes_injected_assembly() -> None:
+    dispose = MagicMock()
+
+    def fail_startup() -> None:
+        raise RuntimeError("startup failed")
+
+    assembly = ComponentAssembly(startup=fail_startup, dispose=dispose)
+
+    with pytest.raises(RuntimeError, match="startup failed"):
+        with TestClient(create_app(assembly=assembly)):
+            pass
+
+    dispose.assert_called_once_with()

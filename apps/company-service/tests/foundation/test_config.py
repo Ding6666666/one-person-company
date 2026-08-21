@@ -41,3 +41,17 @@ def test_settings_read_dsh_spike_environment(monkeypatch, tmp_path: Path) -> Non
     assert isinstance(settings.session_root, Path)
     assert settings.dsh_request_timeout_seconds == 60.0
     assert settings.dsh_shutdown_timeout_seconds == 10.0
+
+
+def test_settings_resolve_runtime_roots_and_explicit_host_credential(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "keyless-explicit-credential")
+
+    settings = Settings(data_root=tmp_path)
+
+    assert settings.resolved_session_root == tmp_path / "sessions"
+    assert settings.resolved_workspace_root == tmp_path / "workspaces"
+    assert settings.deepseek_api_key is not None
+    assert settings.deepseek_api_key.get_secret_value() == "keyless-explicit-credential"
+    assert "keyless-explicit-credential" not in repr(settings)

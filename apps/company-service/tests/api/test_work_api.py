@@ -44,6 +44,9 @@ class NoActiveGateway:
         del attempt_id
         raise AssertionError("pending cancellation has no active runtime to close")
 
+    def shutdown(self) -> None:
+        return None
+
 
 class RecordingCoordinator:
     def __init__(self, engine: Engine) -> None:

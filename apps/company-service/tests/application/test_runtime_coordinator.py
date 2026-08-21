@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event, Thread
 
 import pytest
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
@@ -53,14 +54,18 @@ class RecordingGateway:
         fail: BaseException | None = None,
         cancel_closed: bool = True,
         cancel_fail: BaseException | None = None,
+        finish_reason: str | None = "completed",
     ) -> None:
         self._uow_factory = uow_factory
         self._fail = fail
         self._cancel_closed = cancel_closed
         self._cancel_fail = cancel_fail
+        self._finish_reason = finish_reason
         self.submissions: list[GatewaySubmission] = []
         self.status_at_submit: list[ExecutionStatus] = []
         self.status_at_cancel: list[ExecutionStatus] = []
+        self.shutdown_calls = 0
+        self.submission_started = Event()
 
     def submit(
         self,
@@ -73,6 +78,7 @@ class RecordingGateway:
         assert aggregate is not None
         self.status_at_submit.append(aggregate.execution_links[0].status)
         self.submissions.append(submission)
+        self.submission_started.set()
         on_event(
             ProjectedDshEvent(
                 attempt_id=submission.attempt_id,
@@ -83,7 +89,7 @@ class RecordingGateway:
         if self._fail is not None:
             raise self._fail
         return GatewayResult(
-            finish_reason="completed",
+            finish_reason=self._finish_reason,
             reference_uri=(
                 f"dsh-session://{submission.employee.dsh_session_id}"
                 f"/attempt/{submission.attempt_id}/result"
@@ -101,6 +107,34 @@ class RecordingGateway:
         return GatewayCancelResult(
             requested=self._cancel_closed, runtime_closed=self._cancel_closed
         )
+
+    def shutdown(self) -> None:
+        self.shutdown_calls += 1
+
+
+class BlockingShutdownGateway(RecordingGateway):
+    def __init__(self, uow_factory: Callable[[], SqlAlchemyUnitOfWork]) -> None:
+        super().__init__(uow_factory)
+        self.first_started = Event()
+        self.release_first = Event()
+
+    def submit(
+        self,
+        submission: GatewaySubmission,
+        *,
+        on_event: Callable[[ProjectedDshEvent], None],
+    ) -> GatewayResult:
+        del on_event
+        self.submissions.append(submission)
+        if len(self.submissions) > 1:
+            raise AssertionError("queued work started during shutdown")
+        self.first_started.set()
+        self.release_first.wait(timeout=5)
+        raise RuntimeError("active runtime closed")
+
+    def shutdown(self) -> None:
+        self.shutdown_calls += 1
+        self.release_first.set()
 
 
 @pytest.fixture
@@ -247,6 +281,24 @@ def test_coordinator_stores_only_closed_failure_diagnostic(
     assert "private provider detail" not in repr((stored, events))
 
 
+def test_coordinator_does_not_complete_an_sdk_error_result(
+    sqlite_engine: Engine,
+) -> None:
+    aggregate = _seed(sqlite_engine)
+    factory = _uow_factory(sqlite_engine)
+    gateway = RecordingGateway(factory, finish_reason="error")
+    coordinator = RuntimeCoordinator(factory, gateway, id_factory=SequentialIds())
+
+    coordinator.dispatch(aggregate.nodes[0].id)
+
+    with factory() as uow:
+        stored = uow.works.get(aggregate.work.id)
+    assert stored is not None
+    assert stored.work.status is WorkStatus.FAILED
+    assert stored.nodes[0].failure_code == "gateway_error"
+    assert stored.execution_links[0].diagnostic_code == "gateway_error"
+
+
 @pytest.mark.parametrize(
     ("runtime_closed", "expected_status", "expected_code"),
     [
@@ -357,6 +409,7 @@ def test_startup_requeues_pending_and_blocks_only_running_attempts(
     coordinator = RuntimeCoordinator(factory, gateway, id_factory=SequentialIds())
 
     coordinator.start()
+    assert gateway.submission_started.wait(timeout=5)
     coordinator.shutdown(wait=True)
 
     with factory() as uow:
@@ -370,3 +423,49 @@ def test_startup_requeues_pending_and_blocks_only_running_attempts(
     assert (
         running_stored.execution_links[0].diagnostic_code == "runtime_process_lost"
     )
+
+
+def test_shutdown_closes_gateway_and_rejects_new_dispatch(
+    sqlite_engine: Engine,
+) -> None:
+    factory = _uow_factory(sqlite_engine)
+    gateway = RecordingGateway(factory)
+    coordinator = RuntimeCoordinator(factory, gateway)
+
+    coordinator.shutdown(wait=True)
+    coordinator.shutdown(wait=True)
+
+    assert gateway.shutdown_calls == 1
+    with pytest.raises(RuntimeError, match="shutting down"):
+        coordinator.enqueue(WorkNodeId("node-after-shutdown"))
+
+
+def test_shutdown_cancels_queued_dispatch_before_closing_active_runtime(
+    sqlite_engine: Engine,
+) -> None:
+    first = _seed(sqlite_engine, work_id="first")
+    second = _seed(sqlite_engine, work_id="second")
+    factory = _uow_factory(sqlite_engine)
+    gateway = BlockingShutdownGateway(factory)
+    coordinator = RuntimeCoordinator(factory, gateway, runtime_concurrency=1)
+    coordinator.enqueue(first.nodes[0].id)
+    assert gateway.first_started.wait(timeout=5)
+    coordinator.enqueue(second.nodes[0].id)
+
+    shutdown = Thread(target=coordinator.shutdown)
+    shutdown.start()
+    shutdown.join(timeout=5)
+
+    assert not shutdown.is_alive()
+    assert gateway.shutdown_calls == 1
+    assert [item.attempt_id for item in gateway.submissions] == [
+        first.execution_links[0].attempt_id
+    ]
+    with factory() as uow:
+        queued = uow.works.get(second.work.id)
+    assert queued is not None
+    assert queued.work.status is WorkStatus.QUEUED
+    assert queued.nodes[0].status is WorkNodeStatus.READY
+    assert queued.execution_links[0].status is ExecutionStatus.DISPATCH_PENDING
+    with pytest.raises(RuntimeError, match="shutting down"):
+        coordinator.enqueue(second.nodes[0].id)

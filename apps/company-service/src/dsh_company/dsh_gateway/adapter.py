@@ -61,6 +61,8 @@ class PublicSdkDshGateway:
         working_directory: Path | None = None,
         supervisor: RuntimeSupervisor | None = None,
         provider: str = _DEFAULT_PROVIDER,
+        base_url: str | None = None,
+        api_key: str | None = None,
         request_timeout_seconds: float = _DEFAULT_REQUEST_TIMEOUT_SECONDS,
         shutdown_timeout_seconds: float = _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS,
     ) -> None:
@@ -69,6 +71,8 @@ class PublicSdkDshGateway:
         self._working_directory = working_directory or Path.cwd()
         self._supervisor = supervisor or RuntimeSupervisor()
         self._provider = provider
+        self._base_url = base_url
+        self._api_key = api_key
         self._request_timeout_seconds = request_timeout_seconds
         self._shutdown_timeout_seconds = shutdown_timeout_seconds
         self._cordis_root = Path(__file__).with_name("cordis")
@@ -83,21 +87,26 @@ class PublicSdkDshGateway:
         if runtime_profile not in _RUNTIME_PROFILES:
             raise ValueError(f"unknown DSH runtime profile: {runtime_profile}")
         profile_path = self._cordis_root / f"{runtime_profile}.cordis.yml"
+        harness_config: dict[str, object] = {
+            "provider": self._provider,
+            "model": submission.employee.model,
+            "cwd": str(self._working_directory),
+            "session_root": str(self._session_root),
+            "cordis": str(profile_path),
+            "env": {
+                "DSH_COMPANY_SESSION_ROOT": str(self._session_root),
+                "DSH_COMPANY_WORKSPACE_ROOT": str(self._working_directory),
+            },
+            "request_timeout_seconds": self._request_timeout_seconds,
+            "shutdown_timeout_seconds": self._shutdown_timeout_seconds,
+        }
+        if self._base_url is not None:
+            harness_config["base_url"] = self._base_url
+        if self._api_key is not None:
+            harness_config["api_key"] = self._api_key
         harness = self._supervisor.create(
             submission.attempt_id,
-            lambda: self._harness_factory(
-                provider=self._provider,
-                model=submission.employee.model,
-                cwd=str(self._working_directory),
-                session_root=str(self._session_root),
-                cordis=str(profile_path),
-                env={
-                    "DSH_COMPANY_SESSION_ROOT": str(self._session_root),
-                    "DSH_COMPANY_WORKSPACE_ROOT": str(self._working_directory),
-                },
-                request_timeout_seconds=self._request_timeout_seconds,
-                shutdown_timeout_seconds=self._shutdown_timeout_seconds,
-            ),
+            lambda: self._harness_factory(**harness_config),
         )
         event_count = 0
 
@@ -122,3 +131,6 @@ class PublicSdkDshGateway:
 
     def cancel(self, attempt_id: AttemptId) -> GatewayCancelResult:
         return self._supervisor.cancel(attempt_id)
+
+    def shutdown(self) -> None:
+        self._supervisor.close_all()

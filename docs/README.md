@@ -28,8 +28,14 @@
 - Phase 1A 仓库与工程基础已实现并通过验收；Phase 1B DSH 公共能力 Spike 已实现，能力边界见固定矩阵。
 - Phase 2 Company Core 已实现 Workspace、Employee、不可变 Revision、能力授权、稳定 Binding、
   SQLite 重启恢复、Workspace 隔离及管理 UI；创建流程完全本地，不需要 Provider 凭据且不启动 DSH。
+- Phase 3 已接通 Direct Work 的 HTTP/UI 数据面、真实公开 DSH Gateway、Attempt 独占运行时、
+  安全事件投影、ArtifactReference、取消请求/确认以及启动协调。Company DB 不保存原始
+  transcript、工具参数或模型最终文本。
 - 持久恢复的是 Company Core 事实。固定 DSH 公共 SDK 仍未公开 cold Session resume，稳定的
-  Employee Binding 不代表进程退出后可恢复 live DSH Session。
+  Employee Binding 不代表进程退出后可恢复 live DSH Session。同一 Binding 的前一个 Harness
+  关闭后，第二个 Work 在第二次模型请求前得到 SDK error；Company 将其记录为
+  `failed/gateway_error`，不伪造成完成或自行实现 Memory/恢复框架。重启时发现的 RUNNING
+  Attempt 记录为 `blocked/runtime_process_lost`。
 - 原 `multi-agent` 仓库保持独立、可构建和可验证。
 
 ## 文档权威顺序

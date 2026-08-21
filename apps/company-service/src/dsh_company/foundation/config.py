@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,3 +17,19 @@ class Settings(BaseSettings):
     session_root: Path = Path("../dsh-company-data/sessions")
     dsh_request_timeout_seconds: float = 60.0
     dsh_shutdown_timeout_seconds: float = 10.0
+    dsh_base_url: str | None = None
+    deepseek_api_key: SecretStr | None = Field(
+        default=None, validation_alias="DEEPSEEK_API_KEY"
+    )
+    workspace_root: Path | None = None
+    runtime_concurrency: int = Field(default=4, ge=1)
+
+    @property
+    def resolved_session_root(self) -> Path:
+        if "session_root" in self.model_fields_set:
+            return self.session_root
+        return self.data_root / "sessions"
+
+    @property
+    def resolved_workspace_root(self) -> Path:
+        return self.workspace_root or self.data_root / "workspaces"

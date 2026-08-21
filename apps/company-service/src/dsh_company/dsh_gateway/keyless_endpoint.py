@@ -16,8 +16,27 @@ class ModelRequest:
         return text in json.dumps(self.body)
 
 
+@dataclass(frozen=True, slots=True)
+class HeldModelRequest:
+    request_started: threading.Event
+    release_response: threading.Event
+
+
 class _ModelServer(ThreadingHTTPServer):
     requests: list[ModelRequest]
+    hold_marker: str | None
+    held_request: HeldModelRequest | None
+
+
+def _request_marker(body: dict[str, Any]) -> str:
+    for message in body["messages"]:
+        content = message.get("content")
+        if not isinstance(content, str):
+            continue
+        for line in content.splitlines():
+            if line.strip().startswith("remember "):
+                return line.strip()
+    return "remember KEYLESS_FOLLOWUP"
 
 
 class _ModelHandler(BaseHTTPRequestHandler):
@@ -26,13 +45,15 @@ class _ModelHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         length = int(self.headers.get("content-length", "0"))
         body = json.loads(self.rfile.read(length).decode("utf-8"))
-        session_marker = next(
-            content
-            for message in body["messages"]
-            if isinstance((content := message.get("content")), str)
-            if content.startswith("remember ")
-        )
+        session_marker = _request_marker(body)
         self.server.requests.append(ModelRequest(body=body, marker=session_marker))
+        if (
+            self.server.hold_marker is not None
+            and self.server.hold_marker in json.dumps(body)
+            and self.server.held_request is not None
+        ):
+            self.server.held_request.request_started.set()
+            self.server.held_request.release_response.wait(timeout=10)
         self.send_response(200)
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
@@ -54,6 +75,8 @@ class KeylessModelEndpoint:
     def __init__(self) -> None:
         self._server = _ModelServer(("127.0.0.1", 0), _ModelHandler)
         self._server.requests = []
+        self._server.hold_marker = None
+        self._server.held_request = None
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             name="dsh-company-keyless-endpoint",
@@ -65,6 +88,8 @@ class KeylessModelEndpoint:
         return self
 
     def __exit__(self, _exc_type: object, _exc: object, _tb: object) -> None:
+        if self._server.held_request is not None:
+            self._server.held_request.release_response.set()
         self._server.shutdown()
         self._server.server_close()
         self._thread.join()
@@ -81,3 +106,9 @@ class KeylessModelEndpoint:
 
     def request_for(self, marker: str) -> ModelRequest:
         return next(request for request in self._server.requests if request.marker == marker)
+
+    def hold(self, marker: str) -> HeldModelRequest:
+        held = HeldModelRequest(threading.Event(), threading.Event())
+        self._server.hold_marker = marker
+        self._server.held_request = held
+        return held
