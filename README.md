@@ -1,11 +1,12 @@
 # DSH Company
 
 DSH Company is an independent open-source project built on DSH. The repository now contains the
-Phase 1 engineering foundation and public DSH capability evidence, the Phase 2 Company Core, and
-the Phase 3 Direct Work loop:
+Phase 1 engineering foundation and public DSH capability evidence, the Phase 2 Company Core, the
+Phase 3 Direct Work loop, and Phase 4 governance:
 Workspace and Employee domain models, immutable Employee revisions, capability grants, stable DSH
 bindings, SQLite persistence, loopback APIs, direct execution/history/cancellation, and the
-management UI.
+management UI. Governance adds four-layer capability intersection, operator approvals, immutable
+delegation revisions, and bounded same-Workspace employee delegation.
 
 ## Repository setup
 
@@ -39,8 +40,8 @@ Start the foundation service locally with:
 uv run uvicorn dsh_company.asgi:app --host 127.0.0.1 --port 8000
 ```
 
-The service exposes `/health` together with Workspace, Employee, Work, event-history, and
-cancellation endpoints. When the
+The service exposes `/health` together with Workspace, Employee, Work, event-history,
+cancellation, Workspace capability, approval, and delegation endpoints. When the
 DSH Host starts it, Company data is stored in `company.db` beneath `DSH_COMPANY_DATA_ROOT` and is
 recovered after a service restart. Creating a Workspace or Employee is entirely local: it neither
 requires provider credentials nor starts DSH. Direct Work starts one Attempt-owned public DSH
@@ -50,6 +51,20 @@ reference—not the raw transcript, tool arguments, or final model text.
 
 The public gate runs the fixed DSH runtime against a local keyless model endpoint before the full
 service, contract, and plugin checks. It does not read or forward a Provider credential.
+
+Every governed action requires a matching Workspace grant, immutable Employee revision grant,
+Work Node grant, and Runtime Profile allowance. An approval is persisted before dispatch, and an
+approved action is checked again against the current grants. The fixed Runtime Profiles do not
+expose `external.publish`, so approval cannot expand that unavailable DSH capability. The Phase 4
+keyless acceptance therefore exercises the same approval boundary with an explicitly
+`requires_approval` L2 `workspace.write` grant instead of inventing an L3 runtime path.
+
+The public DSH control path accepts only complete, standalone delegation JSON and then validates it
+against Company facts. It can create a same-Workspace child revision and Attempt, but model output
+is never authority by itself and raw output is not stored or returned by Company APIs. Approval
+control from DSH remains explicitly unavailable as `approval_control_not_exposed`; operators decide
+persisted approvals through the Company API. A completed delegated child contributes only its
+`ArtifactReferenceId` to a new parent Attempt.
 
 The fixed public DSH SDK does not expose cold Session resume. Employee bindings therefore remain
 stable Company facts across restart, but they must not be interpreted as proof that a stopped DSH

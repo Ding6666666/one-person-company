@@ -41,6 +41,8 @@ class RuntimeControlDenied(Exception):
 
 
 class RuntimeGovernancePort(Protocol):
+    def reconcile_startup(self) -> None: ...
+
     def handle(
         self, source_node_id: WorkNodeId, request: ControlRequest
     ) -> tuple[WorkNodeId, ...]: ...
@@ -269,6 +271,12 @@ class RuntimeCoordinator:
             )
         for node_id in running_node_ids:
             self._block_runtime_process_lost(node_id)
+
+        if self._governance_handler is not None:
+            try:
+                self._governance_handler.reconcile_startup()
+            except Exception:
+                _LOGGER.exception("Company governance startup reconciliation failed")
 
         with self._uow_factory() as uow:
             pending_node_ids = tuple(

@@ -46,6 +46,7 @@ def test_public_check_runs_all_keyless_gates_in_order() -> None:
             "pytest",
             "apps/company-service/tests/dsh_gateway",
             "tests/system/tests/test_phase_3_direct_work.py",
+            "tests/system/tests/test_phase_4_governance.py",
             "-q",
         ),
         (

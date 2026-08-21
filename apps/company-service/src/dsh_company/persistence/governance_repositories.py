@@ -182,6 +182,18 @@ class ApprovalRepository:
             if (approval := self.get(ApprovalId(row.id))) is not None
         )
 
+    def list_approved(self) -> tuple[Approval, ...]:
+        rows = self._session.scalars(
+            select(ApprovalRow)
+            .where(ApprovalRow.status == ApprovalStatus.APPROVED.value)
+            .order_by(ApprovalRow.requested_at, ApprovalRow.id)
+        )
+        return tuple(
+            approval
+            for row in rows
+            if (approval := self.get(ApprovalId(row.id))) is not None
+        )
+
 
 class DelegationRepository:
     def __init__(self, session: Session) -> None:
@@ -243,6 +255,18 @@ class DelegationRepository:
         rows = self._session.scalars(
             select(DelegationRow)
             .where(DelegationRow.work_id == work_id)
+            .order_by(DelegationRow.created_at, DelegationRow.id)
+        )
+        return tuple(
+            delegation
+            for row in rows
+            if (delegation := self.get(DelegationId(row.id))) is not None
+        )
+
+    def list_accepted(self) -> tuple[Delegation, ...]:
+        rows = self._session.scalars(
+            select(DelegationRow)
+            .where(DelegationRow.status == "accepted")
             .order_by(DelegationRow.created_at, DelegationRow.id)
         )
         return tuple(

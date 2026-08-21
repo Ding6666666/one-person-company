@@ -101,6 +101,7 @@ def check_commands() -> list[tuple[str, ...]]:
             "pytest",
             "apps/company-service/tests/dsh_gateway",
             "tests/system/tests/test_phase_3_direct_work.py",
+            "tests/system/tests/test_phase_4_governance.py",
             "-q",
         ),
         (
