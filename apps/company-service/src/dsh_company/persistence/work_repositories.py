@@ -21,6 +21,8 @@ from dsh_company.domain.work import (
     ExecutionLink,
     ExecutionStatus,
     Work,
+    WorkEdge,
+    WorkEdgeKind,
     WorkGraphRevision,
     WorkNode,
     WorkNodeStatus,
@@ -36,6 +38,8 @@ from .work_models import (
     ArtifactReferenceRow,
     CompanyEventRow,
     ExecutionLinkRow,
+    WorkEdgeRow,
+    WorkGraphNodeRow,
     WorkGraphRevisionRow,
     WorkNodeRow,
     WorkRow,
@@ -94,6 +98,15 @@ class WorkRepository:
             )
             for node in aggregate.nodes
         }
+        graph_node_rows = [
+            WorkGraphNodeRow(
+                graph_revision_id=graph_row.id,
+                node_id=node_id,
+                position=position,
+            )
+            for position, node_id in enumerate(aggregate.graph.node_ids)
+        ]
+        edge_rows = self._edge_rows(aggregate.graph)
         link_rows = [
             ExecutionLinkRow(
                 id=link.id,
@@ -126,6 +139,8 @@ class WorkRepository:
         )
         try:
             self._session.flush()
+            self._session.add_all([*graph_node_rows, *edge_rows])
+            self._session.flush()
         except IntegrityError as error:
             if "works.workspace_id, works.command_id" in str(error):
                 raise DuplicateCommand(aggregate.work.command_id) from error
@@ -136,6 +151,85 @@ class WorkRepository:
         if work_row is None:
             return None
         return self._aggregate(work_row)
+
+    def add_revision(self, graph: WorkGraphRevision, nodes: tuple[WorkNode, ...]) -> None:
+        if tuple(node.id for node in nodes) != graph.node_ids:
+            raise ValueError("graph node facts must match revision node IDs")
+        work_row = self._session.get(WorkRow, graph.work_id)
+        if work_row is None:
+            raise LookupError("work not found")
+        graph_row = WorkGraphRevisionRow(
+            id=graph.id,
+            work_id=graph.work_id,
+            revision_number=graph.revision_number,
+            strategy=graph.strategy.value,
+            created_at=graph.created_at,
+            work=work_row,
+        )
+        self._session.add(graph_row)
+        self._session.flush()
+        for node in nodes:
+            stored = self._session.get(WorkNodeRow, node.id)
+            if stored is None:
+                self._session.add(self._node_row(node))
+            elif self._node(stored) != node:
+                raise ValueError("graph revision cannot rewrite existing node facts")
+        self._session.flush()
+        self._session.add_all(
+            [
+                *(
+                    WorkGraphNodeRow(
+                        graph_revision_id=graph.id,
+                        node_id=node_id,
+                        position=position,
+                    )
+                    for position, node_id in enumerate(graph.node_ids)
+                ),
+                *self._edge_rows(graph),
+            ]
+        )
+        work_row.current_graph_revision_id = graph.id
+
+    def get_revision(
+        self, revision_id: WorkGraphRevisionId
+    ) -> tuple[WorkGraphRevision, tuple[WorkNode, ...]] | None:
+        graph_row = self._session.get(WorkGraphRevisionRow, revision_id)
+        if graph_row is None:
+            return None
+        membership_rows = tuple(
+            self._session.scalars(
+                select(WorkGraphNodeRow)
+                .where(WorkGraphNodeRow.graph_revision_id == revision_id)
+                .order_by(WorkGraphNodeRow.position)
+            )
+        )
+        node_rows = tuple(
+            self._session.get(WorkNodeRow, membership.node_id) for membership in membership_rows
+        )
+        if any(row is None for row in node_rows):
+            raise RuntimeError("graph revision references a missing node")
+        edges = tuple(
+            WorkEdge(
+                WorkNodeId(row.from_node_id),
+                WorkNodeId(row.to_node_id),
+                WorkEdgeKind(row.kind),
+            )
+            for row in self._session.scalars(
+                select(WorkEdgeRow)
+                .where(WorkEdgeRow.graph_revision_id == revision_id)
+                .order_by(WorkEdgeRow.id)
+            )
+        )
+        graph = WorkGraphRevision(
+            id=WorkGraphRevisionId(graph_row.id),
+            work_id=WorkId(graph_row.work_id),
+            revision_number=graph_row.revision_number,
+            strategy=WorkStrategy(graph_row.strategy),
+            created_at=_from_sqlite_utc(graph_row.created_at),
+            node_ids=tuple(WorkNodeId(row.node_id) for row in membership_rows),
+            edges=edges,
+        )
+        return graph, tuple(self._node(cast(WorkNodeRow, row)) for row in node_rows)
 
     def get_by_command(self, workspace_id: WorkspaceId, command_id: str) -> WorkAggregate | None:
         row = self._session.scalar(
@@ -254,15 +348,12 @@ class WorkRepository:
         return tuple(self._aggregate(row) for row in rows)
 
     def _aggregate(self, work_row: WorkRow) -> WorkAggregate:
-        graph_row = self._session.get(WorkGraphRevisionRow, work_row.current_graph_revision_id)
-        if graph_row is None:
+        revision = self.get_revision(WorkGraphRevisionId(work_row.current_graph_revision_id))
+        if revision is None:
             raise RuntimeError("work persistence record has no current graph")
+        graph, nodes = revision
         node_rows = tuple(
-            self._session.scalars(
-                select(WorkNodeRow)
-                .where(WorkNodeRow.graph_revision_id == graph_row.id)
-                .order_by(WorkNodeRow.id)
-            )
+            cast(WorkNodeRow, self._session.get(WorkNodeRow, node.id)) for node in nodes
         )
         node_ids = [row.id for row in node_rows]
         link_rows = (
@@ -298,15 +389,8 @@ class WorkRepository:
                 current_graph_revision_id=WorkGraphRevisionId(work_row.current_graph_revision_id),
                 created_at=_from_sqlite_utc(work_row.created_at),
             ),
-            graph=WorkGraphRevision(
-                id=WorkGraphRevisionId(graph_row.id),
-                work_id=WorkId(graph_row.work_id),
-                revision_number=graph_row.revision_number,
-                strategy=WorkStrategy(graph_row.strategy),
-                created_at=_from_sqlite_utc(graph_row.created_at),
-                node_ids=tuple(WorkNodeId(row.id) for row in node_rows),
-            ),
-            nodes=tuple(self._node(row) for row in node_rows),
+            graph=graph,
+            nodes=nodes,
             execution_links=tuple(self._link(row) for row in link_rows),
             artifacts=tuple(self._artifact(row) for row in artifact_rows),
         )
@@ -328,6 +412,35 @@ class WorkRepository:
             failure_code=row.failure_code,
             version=row.version,
         )
+
+    @staticmethod
+    def _node_row(node: WorkNode) -> WorkNodeRow:
+        return WorkNodeRow(
+            id=node.id,
+            graph_revision_id=node.graph_revision_id,
+            work_id=node.work_id,
+            objective=node.objective,
+            acceptance_criteria_json=json.dumps(node.acceptance_criteria, ensure_ascii=False),
+            assigned_employee_id=node.assigned_employee_id,
+            employee_revision_id=node.employee_revision_id,
+            status=node.status.value,
+            active_attempt_id=node.active_attempt_id,
+            failure_code=node.failure_code,
+            version=node.version,
+        )
+
+    @staticmethod
+    def _edge_rows(graph: WorkGraphRevision) -> list[WorkEdgeRow]:
+        return [
+            WorkEdgeRow(
+                id=f"{graph.id}:edge:{position:08d}",
+                graph_revision_id=graph.id,
+                from_node_id=edge.from_node_id,
+                to_node_id=edge.to_node_id,
+                kind=edge.kind.value,
+            )
+            for position, edge in enumerate(graph.edges)
+        ]
 
     @staticmethod
     def _link(row: ExecutionLinkRow) -> ExecutionLink:

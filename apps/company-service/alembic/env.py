@@ -2,6 +2,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
+from dsh_company.persistence import models as _models  # noqa: F401
 from dsh_company.persistence import work_models as _work_models  # noqa: F401
 from dsh_company.persistence.models import Base
 from sqlalchemy import engine_from_config, pool

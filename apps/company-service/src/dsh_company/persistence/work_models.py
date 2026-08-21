@@ -35,6 +35,32 @@ class WorkGraphRevisionRow(Base):
     nodes: Mapped[list["WorkNodeRow"]] = relationship(back_populates="graph_revision")
 
 
+class WorkGraphNodeRow(Base):
+    __tablename__ = "work_graph_nodes"
+    __table_args__ = (
+        UniqueConstraint("graph_revision_id", "node_id"),
+        UniqueConstraint("graph_revision_id", "position"),
+    )
+
+    graph_revision_id: Mapped[str] = mapped_column(
+        ForeignKey("work_graph_revisions.id"), primary_key=True
+    )
+    node_id: Mapped[str] = mapped_column(ForeignKey("work_nodes.id"), primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class WorkEdgeRow(Base):
+    __tablename__ = "work_edges"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    graph_revision_id: Mapped[str] = mapped_column(
+        ForeignKey("work_graph_revisions.id"), nullable=False
+    )
+    from_node_id: Mapped[str] = mapped_column(ForeignKey("work_nodes.id"), nullable=False)
+    to_node_id: Mapped[str] = mapped_column(ForeignKey("work_nodes.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+
+
 class WorkNodeRow(Base):
     __tablename__ = "work_nodes"
 
