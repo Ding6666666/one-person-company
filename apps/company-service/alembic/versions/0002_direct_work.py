@@ -57,7 +57,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("node_id", sa.String(), nullable=False),
         sa.Column("attempt_id", sa.String(), nullable=False, unique=True),
-        sa.Column("command_id", sa.String(), nullable=False, unique=True),
+        sa.Column("command_id", sa.String(), nullable=False),
         sa.Column("dsh_session_id", sa.String(), nullable=False),
         sa.Column("status", sa.String(), nullable=False),
         sa.Column("started_at", sa.DateTime(), nullable=True),

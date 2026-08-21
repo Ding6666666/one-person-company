@@ -55,6 +55,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/works/{work_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Work */
+        get: operations["get_work_works__work_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Work */
+        post: operations["cancel_work_works__work_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/works/{work_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Work Events */
+        get: operations["list_work_events_works__work_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces": {
         parameters: {
             query?: never;
@@ -108,10 +159,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspace_id}/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Workspace Works */
+        get: operations["list_workspace_works_workspaces__workspace_id__works_get"];
+        put?: never;
+        /** Create Direct Work */
+        post: operations["create_direct_work_workspaces__workspace_id__works_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ArtifactReference */
+        ArtifactReference: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "dsh_session_result";
+            /** Uri */
+            uri: string;
+        };
+        /** CompanyEvent */
+        CompanyEvent: {
+            /** Attempt Id */
+            attempt_id: string | null;
+            /** Event Type */
+            event_type: string;
+            /** Id */
+            id: string;
+            /** Node Id */
+            node_id: string | null;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Source */
+            source: string;
+            /** Source Sequence */
+            source_sequence: number;
+            /** Summary */
+            summary: string;
+            /** Work Id */
+            work_id: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** DirectWorkCreate */
+        DirectWorkCreate: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Command Id */
+            command_id: string;
+            /** Employee Id */
+            employee_id: string;
+            /** Objective */
+            objective: string;
+        };
         /** Employee */
         Employee: {
             binding: components["schemas"]["EmployeeBinding"];
@@ -218,6 +341,27 @@ export interface components {
         ErrorEnvelope: {
             error: components["schemas"]["ErrorDetail"];
         };
+        /** ExecutionLink */
+        ExecutionLink: {
+            /** Attempt Id */
+            attempt_id: string;
+            /** Diagnostic Code */
+            diagnostic_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: string;
+            /** Node Id */
+            node_id: string;
+            /** Started At */
+            started_at: string | null;
+            status: components["schemas"]["ExecutionStatus"];
+        };
+        /**
+         * ExecutionStatus
+         * @enum {string}
+         */
+        ExecutionStatus: "dispatch_pending" | "running" | "cancel_requested" | "blocked" | "completed" | "failed" | "cancelled";
         /** Grant */
         Grant: {
             /** Action */
@@ -285,6 +429,68 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** WorkNode */
+        WorkNode: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Active Attempt Id */
+            active_attempt_id: string | null;
+            /** Assigned Employee Id */
+            assigned_employee_id: string;
+            /** Employee Revision Id */
+            employee_revision_id: string;
+            /** Failure Code */
+            failure_code: string | null;
+            /** Id */
+            id: string;
+            /** Objective */
+            objective: string;
+            status: components["schemas"]["WorkNodeStatus"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * WorkNodeStatus
+         * @enum {string}
+         */
+        WorkNodeStatus: "ready" | "running" | "blocked" | "completed" | "failed" | "cancelled";
+        /** WorkProjection */
+        WorkProjection: {
+            /** Artifacts */
+            artifacts: components["schemas"]["ArtifactReference"][];
+            /** Command Id */
+            command_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Execution Links */
+            execution_links: components["schemas"]["ExecutionLink"][];
+            /** Graph Revision Id */
+            graph_revision_id: string;
+            /** Graph Revision Number */
+            graph_revision_number: number;
+            /** Id */
+            id: string;
+            /** Nodes */
+            nodes: components["schemas"]["WorkNode"][];
+            /** Objective */
+            objective: string;
+            status: components["schemas"]["WorkStatus"];
+            /**
+             * Strategy
+             * @constant
+             */
+            strategy: "direct";
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /**
+         * WorkStatus
+         * @enum {string}
+         */
+        WorkStatus: "queued" | "running" | "blocked" | "completed" | "failed" | "cancelled";
         /** Workspace */
         Workspace: {
             /**
@@ -411,6 +617,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_work_works__work_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_work_works__work_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_work_events_works__work_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyEvent"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -570,6 +896,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Employee"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_workspace_works_workspaces__workspace_id__works_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjection"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_direct_work_workspaces__workspace_id__works_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectWorkCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjection"];
                 };
             };
             /** @description Not Found */

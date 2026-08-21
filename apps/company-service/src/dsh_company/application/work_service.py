@@ -5,14 +5,16 @@ from dsh_company.domain.ids import (
     WorkGraphRevisionId,
     WorkId,
     WorkNodeId,
+    WorkspaceId,
     new_id,
 )
-from dsh_company.domain.work import ExecutionLink, Work
+from dsh_company.domain.work import CompanyEvent, ExecutionLink, Work
 
 from .ports import (
     DuplicateCommand,
     IdFactory,
     WorkAggregate,
+    WorkCoordinator,
     WorkDispatchQueue,
     WorkUnitOfWork,
 )
@@ -84,3 +86,33 @@ class WorkService:
 
         self._dispatch_queue.enqueue(node.id)
         return aggregate
+
+    def list_for_workspace(
+        self, workspace_id: WorkspaceId
+    ) -> tuple[WorkAggregate, ...]:
+        with self._uow as uow:
+            if uow.workspaces.get(workspace_id) is None:
+                raise LookupError("workspace not found")
+            return uow.works.list_for_workspace(workspace_id)
+
+    def get(self, work_id: WorkId) -> WorkAggregate:
+        with self._uow as uow:
+            aggregate = uow.works.get(work_id)
+        if aggregate is None:
+            raise LookupError("work not found")
+        return aggregate
+
+    def list_events(self, work_id: WorkId) -> tuple[CompanyEvent, ...]:
+        with self._uow as uow:
+            if uow.works.get(work_id) is None:
+                raise LookupError("work not found")
+            return uow.company_events.list_for_work(work_id)
+
+    def request_cancel(
+        self, work_id: WorkId, coordinator: WorkCoordinator
+    ) -> WorkAggregate:
+        aggregate = self.get(work_id)
+        if len(aggregate.nodes) != 1:
+            raise RuntimeError("direct work requires exactly one node")
+        coordinator.request_cancel(aggregate.nodes[0].id)
+        return self.get(work_id)

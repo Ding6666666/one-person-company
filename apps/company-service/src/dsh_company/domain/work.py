@@ -94,6 +94,15 @@ class WorkNode:
             version=self.version + 1,
         )
 
+    def block_before_start(self, failure_code: str) -> "WorkNode":
+        _expect_status(self.status, WorkNodeStatus.READY)
+        return replace(
+            self,
+            status=WorkNodeStatus.BLOCKED,
+            failure_code=failure_code,
+            version=self.version + 1,
+        )
+
     def complete(
         self, attempt_id: AttemptId, result_reference_id: ArtifactReferenceId | None
     ) -> "WorkNode":
@@ -211,6 +220,10 @@ class Work:
         _expect_status(self.status, WorkStatus.QUEUED)
         return replace(self, status=WorkStatus.RUNNING)
 
+    def block_before_start(self) -> "Work":
+        _expect_status(self.status, WorkStatus.QUEUED)
+        return replace(self, status=WorkStatus.BLOCKED)
+
     def block(self) -> "Work":
         _expect_status(self.status, WorkStatus.RUNNING)
         return replace(self, status=WorkStatus.BLOCKED)
@@ -267,7 +280,14 @@ class ExecutionLink:
         return replace(self, status=ExecutionStatus.RUNNING, started_at=datetime.now(UTC))
 
     def request_cancel(self) -> "ExecutionLink":
-        _expect_status(self.status, ExecutionStatus.RUNNING)
+        if self.status not in {
+            ExecutionStatus.DISPATCH_PENDING,
+            ExecutionStatus.RUNNING,
+        }:
+            raise ValueError(
+                "transition requires DISPATCH_PENDING or RUNNING status, "
+                f"got {self.status.name}"
+            )
         return replace(self, status=ExecutionStatus.CANCEL_REQUESTED)
 
     def confirm_cancelled(self) -> "ExecutionLink":

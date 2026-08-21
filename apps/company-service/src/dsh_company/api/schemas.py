@@ -3,7 +3,15 @@ from typing import Annotated, Literal, cast
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from dsh_company.application.ports import EmployeeRecord
+from dsh_company.application.ports import EmployeeRecord, WorkAggregate
+from dsh_company.domain.work import (
+    CompanyEvent as DomainCompanyEvent,
+)
+from dsh_company.domain.work import (
+    ExecutionStatus,
+    WorkNodeStatus,
+    WorkStatus,
+)
 from dsh_company.domain.workspace import Workspace as DomainWorkspace
 
 Name = Annotated[
@@ -19,6 +27,7 @@ Action = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
 ]
 ResourceKind = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class WorkspaceCreate(BaseModel):
@@ -139,4 +148,132 @@ class Employee(BaseModel):
                 )
                 for grant in record.grants
             ],
+        )
+
+
+class DirectWorkCreate(BaseModel):
+    employee_id: NonBlank
+    objective: NonBlank
+    acceptance_criteria: list[NonBlank] = Field(min_length=1)
+    command_id: NonBlank
+
+
+class WorkNode(BaseModel):
+    id: str
+    objective: str
+    acceptance_criteria: list[str]
+    assigned_employee_id: str
+    employee_revision_id: str
+    status: WorkNodeStatus
+    active_attempt_id: str | None
+    failure_code: str | None
+    version: int
+
+
+class ExecutionLink(BaseModel):
+    id: str
+    node_id: str
+    attempt_id: str
+    status: ExecutionStatus
+    started_at: datetime | None
+    finished_at: datetime | None
+    diagnostic_code: str | None
+
+
+class ArtifactReference(BaseModel):
+    id: str
+    kind: Literal["dsh_session_result"]
+    uri: str
+    created_at: datetime
+
+
+class WorkProjection(BaseModel):
+    id: str
+    workspace_id: str
+    command_id: str
+    objective: str
+    status: WorkStatus
+    graph_revision_id: str
+    graph_revision_number: int
+    strategy: Literal["direct"]
+    nodes: list[WorkNode]
+    execution_links: list[ExecutionLink]
+    artifacts: list[ArtifactReference]
+    created_at: datetime
+
+    @classmethod
+    def from_aggregate(cls, aggregate: WorkAggregate) -> "WorkProjection":
+        return cls(
+            id=aggregate.work.id,
+            workspace_id=aggregate.work.workspace_id,
+            command_id=aggregate.work.command_id,
+            objective=aggregate.work.objective,
+            status=aggregate.work.status,
+            graph_revision_id=aggregate.graph.id,
+            graph_revision_number=aggregate.graph.revision_number,
+            strategy="direct",
+            nodes=[
+                WorkNode(
+                    id=node.id,
+                    objective=node.objective,
+                    acceptance_criteria=list(node.acceptance_criteria),
+                    assigned_employee_id=node.assigned_employee_id,
+                    employee_revision_id=node.employee_revision_id,
+                    status=node.status,
+                    active_attempt_id=node.active_attempt_id,
+                    failure_code=node.failure_code,
+                    version=node.version,
+                )
+                for node in aggregate.nodes
+            ],
+            execution_links=[
+                ExecutionLink(
+                    id=link.id,
+                    node_id=link.node_id,
+                    attempt_id=link.attempt_id,
+                    status=link.status,
+                    started_at=link.started_at,
+                    finished_at=link.finished_at,
+                    diagnostic_code=link.diagnostic_code,
+                )
+                for link in aggregate.execution_links
+            ],
+            artifacts=[
+                ArtifactReference(
+                    id=artifact.id,
+                    kind=artifact.kind,
+                    uri=artifact.uri,
+                    created_at=artifact.created_at,
+                )
+                for artifact in aggregate.artifacts
+            ],
+            created_at=aggregate.work.created_at,
+        )
+
+
+class CompanyEvent(BaseModel):
+    id: str
+    workspace_id: str
+    work_id: str
+    node_id: str | None
+    attempt_id: str | None
+    source_sequence: int
+    event_type: str
+    summary: str
+    source: str
+    observed_at: datetime
+
+    @classmethod
+    def from_domain(cls, event: DomainCompanyEvent) -> "CompanyEvent":
+        return cls(
+            id=event.id,
+            workspace_id=event.workspace_id,
+            work_id=event.work_id,
+            node_id=event.node_id,
+            attempt_id=event.attempt_id,
+            source_sequence=event.source_sequence,
+            event_type=event.event_type,
+            summary=event.summary,
+            source=event.source,
+            observed_at=event.observed_at,
         )

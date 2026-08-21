@@ -105,6 +105,10 @@ class WorkRepository(Protocol):
 
     def get_for_attempt(self, attempt_id: AttemptId) -> WorkAggregate | None: ...
 
+    def list_for_workspace(
+        self, workspace_id: WorkspaceId
+    ) -> tuple[WorkAggregate, ...]: ...
+
     def list_dispatch_pending(self) -> tuple[WorkAggregate, ...]: ...
 
     def list_running(self) -> tuple[WorkAggregate, ...]: ...
@@ -120,6 +124,10 @@ class CompanyEventRepository(Protocol):
 
 class WorkDispatchQueue(Protocol):
     def enqueue(self, node_id: WorkNodeId) -> None: ...
+
+
+class WorkCoordinator(WorkDispatchQueue, Protocol):
+    def request_cancel(self, node_id: WorkNodeId) -> None: ...
 
 
 class UnitOfWork(Protocol):

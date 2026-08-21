@@ -64,7 +64,7 @@ class ExecutionLinkRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     node_id: Mapped[str] = mapped_column(ForeignKey("work_nodes.id"), nullable=False)
     attempt_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-    command_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    command_id: Mapped[str] = mapped_column(String, nullable=False)
     dsh_session_id: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)

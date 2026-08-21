@@ -55,10 +55,15 @@ def sqlite_uow(sqlite_engine: Engine) -> SqlAlchemyUnitOfWork:
     return SqlAlchemyUnitOfWork(sqlite_engine)
 
 
-def _seed_company(uow: SqlAlchemyUnitOfWork) -> EmployeeRevisionId:
-    workspace = Workspace.create(WorkspaceId("ws-1"), "Direct work")
+def _seed_company(
+    uow: SqlAlchemyUnitOfWork,
+    *,
+    workspace_id: str = "ws-1",
+    employee_id: str = "emp-1",
+) -> EmployeeRevisionId:
+    workspace = Workspace.create(WorkspaceId(workspace_id), "Direct work")
     employee, revision, binding = Employee.create(
-        employee_id=EmployeeId("emp-1"),
+        employee_id=EmployeeId(employee_id),
         workspace_id=workspace.id,
         display_name="Editor",
         responsibility="Write",
@@ -76,13 +81,16 @@ def _aggregate(
     command_id: str = "cmd-1",
     status: ExecutionStatus = ExecutionStatus.DISPATCH_PENDING,
     employee_revision_id: EmployeeRevisionId = _UNUSED_REVISION_ID,
+    workspace_id: str = "ws-1",
+    employee_id: str = "emp-1",
+    link_command_id: str | None = None,
 ) -> WorkAggregate:
     work, graph, node = Work.create_direct(
         work_id=WorkId(work_id),
         graph_id=WorkGraphRevisionId(f"graph-{work_id}"),
         node_id=WorkNodeId(f"node-{work_id}"),
-        workspace_id=WorkspaceId("ws-1"),
-        employee_id=EmployeeId("emp-1"),
+        workspace_id=WorkspaceId(workspace_id),
+        employee_id=EmployeeId(employee_id),
         employee_revision_id=employee_revision_id,
         objective="Write a release note",
         acceptance_criteria=("Has a title", "Under 800 words"),
@@ -92,8 +100,8 @@ def _aggregate(
         execution_link_id=ExecutionLinkId(f"link-{work_id}"),
         attempt_id=AttemptId(f"attempt-{work_id}"),
         node_id=node.id,
-        command_id=f"dispatch-{work_id}",
-        dsh_session_id="employee-emp-1",
+        command_id=link_command_id or f"dispatch-{work_id}",
+        dsh_session_id=f"employee-{employee_id}",
     )
     if status is ExecutionStatus.RUNNING:
         link = link.mark_running()
@@ -157,6 +165,41 @@ def test_command_id_is_unique_per_workspace(
                 )
             )
             uow.commit()
+
+
+def test_same_command_id_is_independent_across_workspaces(
+    sqlite_uow: SqlAlchemyUnitOfWork,
+) -> None:
+    with sqlite_uow as uow:
+        first_revision = _seed_company(uow)
+        second_revision = _seed_company(
+            uow, workspace_id="ws-2", employee_id="emp-2"
+        )
+        first = _aggregate(
+            work_id="work-1",
+            command_id="shared-command",
+            employee_revision_id=first_revision,
+            link_command_id="shared-command",
+        )
+        second = _aggregate(
+            work_id="work-2",
+            command_id="shared-command",
+            employee_revision_id=second_revision,
+            workspace_id="ws-2",
+            employee_id="emp-2",
+            link_command_id="shared-command",
+        )
+        uow.works.add(first)
+        uow.works.add(second)
+        uow.commit()
+
+    with sqlite_uow as uow:
+        assert uow.works.get_by_command(
+            WorkspaceId("ws-1"), "shared-command"
+        ) == first
+        assert uow.works.get_by_command(
+            WorkspaceId("ws-2"), "shared-command"
+        ) == second
 
 
 def test_work_queries_filter_workspace_and_lifecycle(

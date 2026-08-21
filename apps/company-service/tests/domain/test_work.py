@@ -175,6 +175,28 @@ def test_execution_link_distinguishes_cancel_request_and_confirmation() -> None:
     assert confirmed.finished_at is not None
 
 
+def test_pending_cancel_request_can_be_blocked_without_starting_attempt() -> None:
+    work, _graph, node = direct_work()
+    link = ExecutionLink.dispatch(
+        execution_link_id=ExecutionLinkId("link-1"),
+        attempt_id=AttemptId("attempt-1"),
+        node_id=node.id,
+        command_id="cmd-1",
+        dsh_session_id="employee-emp-1",
+    )
+
+    requested = link.request_cancel()
+    blocked_link = requested.block(link.attempt_id, "cancel_unconfirmed")
+    blocked_node = node.block_before_start("cancel_unconfirmed")
+    blocked_work = work.block_before_start()
+
+    assert requested.status is ExecutionStatus.CANCEL_REQUESTED
+    assert blocked_link.status is ExecutionStatus.BLOCKED
+    assert blocked_node.status is WorkNodeStatus.BLOCKED
+    assert blocked_node.active_attempt_id is None
+    assert blocked_work.status is WorkStatus.BLOCKED
+
+
 def test_execution_link_rejects_invalid_transition_and_attempt() -> None:
     pending = ExecutionLink.dispatch(
         execution_link_id=ExecutionLinkId("link-1"),
@@ -184,8 +206,6 @@ def test_execution_link_rejects_invalid_transition_and_attempt() -> None:
         dsh_session_id="employee-emp-1",
     )
 
-    with pytest.raises(ValueError, match="DISPATCH_PENDING"):
-        pending.request_cancel()
     running = pending.mark_running()
     with pytest.raises(ValueError, match="attempt"):
         running.complete(AttemptId("attempt-2"), ArtifactReferenceId("artifact-1"))

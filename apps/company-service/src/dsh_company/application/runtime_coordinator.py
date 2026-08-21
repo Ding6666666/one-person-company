@@ -17,6 +17,7 @@ from dsh_company.domain.work import (
     ExecutionLink,
     ExecutionStatus,
     WorkNode,
+    WorkNodeStatus,
 )
 from dsh_company.dsh_gateway.contracts import (
     DshGateway,
@@ -102,12 +103,46 @@ class RuntimeCoordinator:
             with self._uow_factory() as uow:
                 aggregate = self._require_node(uow.works.get_for_node(node_id), node_id)
                 link = self._single_link(aggregate)
-                requested = link.request_cancel()
-                uow.works.update(
-                    replace(aggregate, execution_links=(requested,))
-                )
-                uow.commit()
+                if link.status in {
+                    ExecutionStatus.BLOCKED,
+                    ExecutionStatus.COMPLETED,
+                    ExecutionStatus.FAILED,
+                    ExecutionStatus.CANCELLED,
+                }:
+                    return
+                if link.status is ExecutionStatus.CANCEL_REQUESTED:
+                    requested = link
+                else:
+                    requested = link.request_cancel()
+                    uow.works.update(
+                        replace(aggregate, execution_links=(requested,))
+                    )
+                    uow.commit()
                 attempt_id = requested.attempt_id
+                pending_without_runtime = (
+                    self._single_node(aggregate).status is WorkNodeStatus.READY
+                )
+
+            if pending_without_runtime:
+                with self._uow_factory() as uow:
+                    aggregate = self._require_node(
+                        uow.works.get_for_node(node_id), node_id
+                    )
+                    link = self._single_link(aggregate)
+                    if link.status is not ExecutionStatus.CANCEL_REQUESTED:
+                        return
+                    node = self._single_node(aggregate)
+                    updated = replace(
+                        aggregate,
+                        work=aggregate.work.block_before_start(),
+                        nodes=(node.block_before_start("cancel_unconfirmed"),),
+                        execution_links=(
+                            link.block(attempt_id, "cancel_unconfirmed"),
+                        ),
+                    )
+                    uow.works.update(updated)
+                    uow.commit()
+                return
 
         try:
             result = self._gateway.cancel(attempt_id)
