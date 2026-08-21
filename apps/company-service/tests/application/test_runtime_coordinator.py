@@ -137,6 +137,17 @@ class BlockingShutdownGateway(RecordingGateway):
         self.release_first.set()
 
 
+class BlockingTerminalObserver:
+    def __init__(self) -> None:
+        self.entered = Event()
+        self.release = Event()
+
+    def reconcile(self, work_id: WorkId) -> None:
+        del work_id
+        self.entered.set()
+        assert self.release.wait(timeout=5)
+
+
 @pytest.fixture
 def sqlite_engine(tmp_path: Path) -> Iterator[Engine]:
     engine = create_sqlite_engine(tmp_path / "company.db")
@@ -450,6 +461,98 @@ def test_startup_requeues_pending_and_blocks_only_running_attempts(
     )
 
 
+def test_startup_does_not_block_a_new_attempt_after_scanning_the_old_one(
+    sqlite_engine: Engine,
+) -> None:
+    running = _seed(
+        sqlite_engine, work_id="startup-race", execution_status=ExecutionStatus.RUNNING
+    )
+    factory = _uow_factory(sqlite_engine)
+    old_link = running.execution_links[0]
+    retry_link = ExecutionLink.dispatch(
+        execution_link_id=ExecutionLinkId("retry-link"),
+        attempt_id=AttemptId("retry-attempt"),
+        node_id=running.nodes[0].id,
+        command_id="retry-command",
+        dsh_session_id=old_link.dsh_session_id,
+    )
+    retried = replace(
+        running,
+        nodes=(
+            replace(
+                running.nodes[0],
+                status=WorkNodeStatus.READY,
+                active_attempt_id=None,
+                attempt_count=2,
+                version=running.nodes[0].version + 1,
+            ),
+        ),
+        execution_links=(old_link, retry_link),
+    )
+    with factory() as uow:
+        uow.works.update(retried)
+        uow.commit()
+    coordinator = RuntimeCoordinator(factory, RecordingGateway(factory))
+
+    coordinator._block_runtime_process_lost(  # noqa: SLF001
+        running.nodes[0].id, old_link.attempt_id
+    )
+
+    with factory() as uow:
+        stored = uow.works.get(running.work.id)
+    assert stored is not None
+    assert stored.nodes[0].status is WorkNodeStatus.READY
+    assert stored.execution_links[1].status is ExecutionStatus.DISPATCH_PENDING
+    coordinator.shutdown()
+
+
+def test_dispatch_reconciles_a_pending_retry_with_the_old_attempt_blocked(
+    sqlite_engine: Engine,
+) -> None:
+    running = _seed(
+        sqlite_engine, work_id="pending-retry-race", execution_status=ExecutionStatus.RUNNING
+    )
+    factory = _uow_factory(sqlite_engine)
+    old_link = running.execution_links[0]
+    retry_link = ExecutionLink.dispatch(
+        execution_link_id=ExecutionLinkId("pending-retry-link"),
+        attempt_id=AttemptId("pending-retry-attempt"),
+        node_id=running.nodes[0].id,
+        command_id="pending-retry-command",
+        dsh_session_id=old_link.dsh_session_id,
+    )
+    raced = replace(
+        running,
+        work=replace(running.work, status=WorkStatus.BLOCKED),
+        nodes=(
+            replace(
+                running.nodes[0].block(old_link.attempt_id, "runtime_process_lost"),
+                attempt_count=2,
+                max_attempts=2,
+            ),
+        ),
+        execution_links=(
+            old_link.block(old_link.attempt_id, "runtime_process_lost"),
+            retry_link,
+        ),
+    )
+    with factory() as uow:
+        uow.works.update(raced)
+        uow.commit()
+    gateway = RecordingGateway(factory)
+    coordinator = RuntimeCoordinator(factory, gateway)
+
+    coordinator.dispatch(running.nodes[0].id)
+
+    assert [item.attempt_id for item in gateway.submissions] == [retry_link.attempt_id]
+    with factory() as uow:
+        stored = uow.works.get(running.work.id)
+    assert stored is not None
+    assert stored.nodes[0].status is WorkNodeStatus.COMPLETED
+    assert stored.execution_links[1].status is ExecutionStatus.COMPLETED
+    coordinator.shutdown()
+
+
 def test_shutdown_closes_gateway_and_rejects_new_dispatch(
     sqlite_engine: Engine,
 ) -> None:
@@ -463,6 +566,33 @@ def test_shutdown_closes_gateway_and_rejects_new_dispatch(
     assert gateway.shutdown_calls == 1
     with pytest.raises(RuntimeError, match="shutting down"):
         coordinator.enqueue(WorkNodeId("node-after-shutdown"))
+
+
+def test_wait_for_idle_includes_terminal_observer_completion(
+    sqlite_engine: Engine,
+) -> None:
+    aggregate = _seed(sqlite_engine, work_id="terminal-observer-barrier")
+    factory = _uow_factory(sqlite_engine)
+    observer = BlockingTerminalObserver()
+    coordinator = RuntimeCoordinator(
+        factory,
+        RecordingGateway(factory),
+        terminal_observer=observer,
+    )
+    coordinator.enqueue(aggregate.nodes[0].id)
+    assert observer.entered.wait(timeout=5)
+
+    try:
+        with factory() as uow:
+            stored = uow.works.get(aggregate.work.id)
+        assert stored is not None
+        assert stored.work.status is WorkStatus.COMPLETED
+        assert coordinator.wait_for_idle(timeout_seconds=0.01) is False
+    finally:
+        observer.release.set()
+
+    assert coordinator.wait_for_idle(timeout_seconds=5) is True
+    coordinator.shutdown()
 
 
 def test_shutdown_cancels_queued_dispatch_before_closing_active_runtime(

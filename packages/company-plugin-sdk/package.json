@@ -1,0 +1,27 @@
+{
+  "name": "@dsh/company-plugin-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "lib/types/**/*.d.ts"],
+  "engines": { "node": ">=22.19.0", "pnpm": ">=11.0.0" },
+  "scripts": {
+    "build:types": "tsc -p tsconfig.build.json",
+    "build": "pnpm run build:types && tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "pnpm typecheck && pnpm build && pnpm test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsdown": "0.21.0",
+    "vitest": "^4.1.8"
+  }
+}

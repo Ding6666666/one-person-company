@@ -377,6 +377,43 @@ def test_work_queries_filter_workspace_and_lifecycle(
         assert uow.works.list_running() == (running,)
 
 
+def test_stale_aggregate_cannot_reopen_a_terminal_execution_link(
+    sqlite_uow: SqlAlchemyUnitOfWork,
+) -> None:
+    running = _aggregate(status=ExecutionStatus.RUNNING)
+    with sqlite_uow as uow:
+        revision_id = _seed_company(uow)
+        running = replace(
+            running,
+            nodes=(replace(running.nodes[0], employee_revision_id=revision_id),),
+        )
+        uow.works.add(running)
+        uow.commit()
+
+    attempt_id = running.execution_links[0].attempt_id
+    blocked = replace(
+        running,
+        work=replace(running.work, status=WorkStatus.BLOCKED),
+        nodes=(running.nodes[0].block(attempt_id, "runtime_process_lost"),),
+        execution_links=(
+            running.execution_links[0].block(attempt_id, "runtime_process_lost"),
+        ),
+    )
+    with sqlite_uow as uow:
+        uow.works.update(blocked)
+        uow.commit()
+
+    stale_link_update = replace(blocked, execution_links=running.execution_links)
+    with sqlite_uow as uow:
+        uow.works.update(stale_link_update)
+        uow.commit()
+    with sqlite_uow as uow:
+        persisted = uow.works.get(running.work.id)
+
+    assert persisted is not None
+    assert persisted.execution_links[0].status is ExecutionStatus.BLOCKED
+
+
 def test_company_events_keep_attempt_source_sequence(
     sqlite_uow: SqlAlchemyUnitOfWork,
 ) -> None:

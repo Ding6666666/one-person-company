@@ -145,3 +145,13 @@ class DelegationRow(Base):
     )
     status: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(nullable=False)
+
+
+class BusinessPluginRegistrationRow(Base):
+    __tablename__ = "business_plugin_registrations"
+
+    plugin_id: Mapped[str] = mapped_column(String, primary_key=True)
+    version: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    manifest_json: Mapped[str] = mapped_column(Text, nullable=False)
+    registered_at: Mapped[datetime] = mapped_column(nullable=False)

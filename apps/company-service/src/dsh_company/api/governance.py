@@ -8,6 +8,7 @@ from dsh_company.application.delegation_service import (
     DelegationService,
 )
 from dsh_company.application.governance_service import GovernanceService
+from dsh_company.business_plugins.registry import BusinessPluginRegistry
 from dsh_company.domain.approval import Approval
 from dsh_company.domain.capabilities import CapabilityGrant, CapabilityLevel
 from dsh_company.domain.delegation import Delegation, DelegationProposal
@@ -22,7 +23,12 @@ from dsh_company.domain.ids import (
 )
 from dsh_company.persistence.governance_repositories import ConcurrentApprovalDecision
 
-from .errors import ConflictError, ErrorEnvelope, ResourceNotFoundError
+from .errors import (
+    ConflictError,
+    ErrorEnvelope,
+    ResourceNotFoundError,
+    UnprocessableEntityError,
+)
 from .schemas import (
     ApprovalDecision,
     ApprovalDecisionProjection,
@@ -120,6 +126,19 @@ def replace_workspace_capabilities(
     body: WorkspaceCapabilitiesUpdate,
 ) -> WorkspaceCapabilities:
     value = WorkspaceId(workspace_id)
+    catalog = BusinessPluginRegistry(request.app.state.assembly.uow_factory).action_catalog()
+    actions = [grant.action for grant in body.grants]
+    if len(actions) != len(set(actions)):
+        raise UnprocessableEntityError(
+            "invalid_capability_grant", "capability actions must be unique"
+        )
+    for grant in body.grants:
+        required_level = catalog.level(grant.action)
+        if required_level is None or grant.level != int(required_level):
+            raise UnprocessableEntityError(
+                "invalid_capability_grant",
+                "capability action and level must match the registered catalog",
+            )
     with request.app.state.assembly.uow_factory() as uow:
         if uow.workspaces.get(value) is None:
             raise ResourceNotFoundError("workspace")
@@ -258,7 +277,11 @@ def list_work_delegations(request: Request, work_id: str) -> DelegationCollectio
 @router.post(
     "/works/{work_id}/delegations",
     response_model=DelegationResultProjection,
-    responses={**not_found_response, **conflict_response},
+    responses={
+        **not_found_response,
+        **conflict_response,
+        422: {"model": ErrorEnvelope},
+    },
 )
 def create_delegation(
     request: Request,
@@ -266,6 +289,22 @@ def create_delegation(
     body: DelegationCreate,
     service: DelegationDependency,
 ) -> DelegationResultProjection:
+    action_catalog = BusinessPluginRegistry(
+        request.app.state.assembly.uow_factory
+    ).action_catalog()
+    unknown_action = next(
+        (
+            action
+            for action in body.required_actions
+            if action not in action_catalog.actions
+        ),
+        None,
+    )
+    if unknown_action is not None:
+        raise UnprocessableEntityError(
+            "invalid_delegation_action",
+            f"unknown delegation action: {unknown_action}",
+        )
     with request.app.state.assembly.uow_factory() as uow:
         aggregate = uow.works.get(WorkId(work_id))
         if aggregate is None:

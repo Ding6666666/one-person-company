@@ -335,3 +335,72 @@ def test_delegation_rejects_oversized_objective_before_domain_mutation(
     )
 
     assert response.status_code == 422
+
+
+def test_registered_plugin_delegation_action_reaches_authoritative_service(
+    client: TestClient, engine: Engine
+) -> None:
+    _workspace, proposer, work = _seed_work(client, engine)
+    assert (
+        client.post(
+            "/business-plugins/register",
+            json={
+                "plugin_id": "content-studio",
+                "version": "0.1.0",
+                "display_name": "Content Studio",
+                "capability_actions": [
+                    {
+                        "action": "content-studio.publish_draft",
+                        "level": 3,
+                        "runtime_profiles": ["workspace_write"],
+                    }
+                ],
+                "templates": [],
+            },
+        ).status_code
+        == 201
+    )
+
+    response = client.post(
+        f"/works/{work['id']}/delegations",
+        json={
+            "source_node_id": work["nodes"][0]["id"],
+            "proposer_employee_id": proposer["id"],
+            "target_employee_id": proposer["id"],
+            "objective": "Publish draft",
+            "acceptance_criteria": ["Published"],
+            "required_actions": ["content-studio.publish_draft"],
+            "resource_values": ["repo-a"],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "delegation_denied"
+
+
+def test_unknown_delegation_action_has_stable_validation_error(
+    client: TestClient, engine: Engine
+) -> None:
+    _workspace, proposer, work = _seed_work(client, engine)
+
+    response = client.post(
+        f"/works/{work['id']}/delegations",
+        json={
+            "source_node_id": work["nodes"][0]["id"],
+            "proposer_employee_id": proposer["id"],
+            "target_employee_id": proposer["id"],
+            "objective": "Unknown action",
+            "acceptance_criteria": ["Rejected"],
+            "required_actions": ["content-studio.unknown"],
+            "resource_values": ["repo-a"],
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_delegation_action"
+    assert (
+        client.get("/openapi.json").json()["paths"]["/works/{work_id}/delegations"][
+            "post"
+        ]["responses"]["422"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/ErrorEnvelope"
+    )

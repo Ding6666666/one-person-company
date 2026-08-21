@@ -19,7 +19,6 @@ from dsh_company.domain.ids import (
     new_id,
 )
 from dsh_company.domain.policy import (
-    ACTION_LEVELS,
     ActionRequest,
     DecisionKind,
     PolicyDecision,
@@ -32,7 +31,6 @@ from dsh_company.domain.work import (
     WorkNode,
     WorkNodeStatus,
 )
-from dsh_company.policy.runtime_profiles import actions_for_runtime_profile
 
 from .ports import (
     EmployeeRecord,
@@ -124,9 +122,7 @@ class DelegationService:
                     ids=self._ids,
                 )
                 target_node = revision.nodes[-1]
-                parent_node = source.block(
-                    self._active_attempt(source), "waiting_delegation"
-                )
+                parent_node = source.block(self._active_attempt(source), "waiting_delegation")
                 parent_link = self._active_link(aggregate, source)
                 blocked_parent_link = parent_link.block(
                     parent_link.attempt_id, "waiting_delegation"
@@ -140,8 +136,7 @@ class DelegationService:
                     dsh_session_id=target.binding.dsh_session_id,
                 )
                 updated_nodes = tuple(
-                    parent_node if node.id == source.id else node
-                    for node in revision.nodes
+                    parent_node if node.id == source.id else node for node in revision.nodes
                 )
                 updated_links = tuple(
                     blocked_parent_link if link.id == parent_link.id else link
@@ -203,11 +198,7 @@ class DelegationService:
             if child.status is not WorkNodeStatus.COMPLETED:
                 raise ValueError("delegated child is not completed")
             artifact = next(
-                (
-                    item
-                    for item in aggregate.artifacts
-                    if item.id == artifact_reference_id
-                ),
+                (item for item in aggregate.artifacts if item.id == artifact_reference_id),
                 None,
             )
             if artifact is None or artifact.workspace_id != delegation.workspace_id:
@@ -246,8 +237,7 @@ class DelegationService:
             updated = replace(
                 aggregate,
                 nodes=tuple(
-                    resumed_parent if node.id == parent.id else node
-                    for node in aggregate.nodes
+                    resumed_parent if node.id == parent.id else node for node in aggregate.nodes
                 ),
                 execution_links=(*aggregate.execution_links, resumed_link),
             )
@@ -256,9 +246,7 @@ class DelegationService:
             uow.delegations.update(completed_delegation)
             uow.commit()
             parent_node_id = parent.id
-            result = DelegationCompletion(
-                completed_delegation, resumed_parent, references
-            )
+            result = DelegationCompletion(completed_delegation, resumed_parent, references)
 
         if parent_node_id is not None and self._dispatch_queue is not None:
             self._dispatch_queue.enqueue(parent_node_id)
@@ -325,10 +313,8 @@ class DelegationService:
             resources=resources,
         )
         self._require_allowed(decision)
-        template = self._for_action(
-            uow.node_grants.list_for_node(source.id), action
-        )
-        level = ACTION_LEVELS.get(action)
+        template = self._for_action(uow.node_grants.list_for_node(source.id), action)
+        level = self._policy_engine.required_level(action)
         if template is None or level is None:
             raise DelegationDenied("node_not_granted")
         return CapabilityGrant(
@@ -356,7 +342,7 @@ class DelegationService:
         )
         employee_grant = self._for_action(employee.grants, action)
         node_grant = self._for_action(uow.node_grants.list_for_node(source.id), action)
-        runtime_grant = self._runtime_grant(
+        runtime_grant = self._policy_engine.runtime_grant(
             employee.revision.runtime_profile,
             action,
             workspace_grant or employee_grant or node_grant,
@@ -375,9 +361,8 @@ class DelegationService:
         requested = frozenset(resources)
         if not requested:
             return PolicyDecision(DecisionKind.DENY, "resource_scope_empty")
-        if (
-            "*" not in decision.effective_resources
-            and not requested.issubset(decision.effective_resources)
+        if "*" not in decision.effective_resources and not requested.issubset(
+            decision.effective_resources
         ):
             return PolicyDecision(DecisionKind.DENY, "resource_scope_empty")
         return PolicyDecision(DecisionKind.ALLOW, decision.reason, requested)
@@ -399,19 +384,14 @@ class DelegationService:
     ) -> None:
         if source.status is WorkNodeStatus.RUNNING:
             parent_link = self._active_link(aggregate, source)
-            blocked_source = source.block(
-                parent_link.attempt_id, "delegation_rejected"
-            )
-            blocked_link = parent_link.block(
-                parent_link.attempt_id, "delegation_rejected"
-            )
+            blocked_source = source.block(parent_link.attempt_id, "delegation_rejected")
+            blocked_link = parent_link.block(parent_link.attempt_id, "delegation_rejected")
             uow.works.update(
                 replace(
                     aggregate,
                     work=aggregate.work.block(),
                     nodes=tuple(
-                        blocked_source if node.id == source.id else node
-                        for node in aggregate.nodes
+                        blocked_source if node.id == source.id else node for node in aggregate.nodes
                     ),
                     execution_links=tuple(
                         blocked_link if link.id == parent_link.id else link
@@ -448,36 +428,11 @@ class DelegationService:
         )
 
     @staticmethod
-    def _runtime_grant(
-        runtime_profile: str,
-        action: str,
-        resource_template: CapabilityGrant | None,
-    ) -> CapabilityGrant | None:
-        if action not in actions_for_runtime_profile(runtime_profile):
-            return None
-        level = ACTION_LEVELS.get(action)
-        if level is None or resource_template is None:
-            return None
-        return CapabilityGrant(
-            id=CapabilityGrantId(f"runtime:{runtime_profile}:{action}"),
-            employee_revision_id=None,
-            action=action,
-            level=level,
-            resource_kind=resource_template.resource_kind,
-            resource_values=("*",),
-            requires_approval=False,
-        )
-
-    @staticmethod
-    def _for_action(
-        grants: tuple[CapabilityGrant, ...], action: str
-    ) -> CapabilityGrant | None:
+    def _for_action(grants: tuple[CapabilityGrant, ...], action: str) -> CapabilityGrant | None:
         return next((grant for grant in grants if grant.action == action), None)
 
     @staticmethod
-    def _require_aggregate(
-        aggregate: WorkAggregate | None, node_id: WorkNodeId
-    ) -> WorkAggregate:
+    def _require_aggregate(aggregate: WorkAggregate | None, node_id: WorkNodeId) -> WorkAggregate:
         if aggregate is None:
             raise LookupError(f"work node not found: {node_id}")
         return aggregate

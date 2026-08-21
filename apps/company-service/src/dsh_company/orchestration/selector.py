@@ -7,14 +7,12 @@ from dsh_company.domain.employee import (
     EmployeeRevision,
     EmployeeStatus,
 )
-from dsh_company.domain.ids import CapabilityGrantId, EmployeeId, WorkspaceId
+from dsh_company.domain.ids import EmployeeId, WorkspaceId
 from dsh_company.domain.policy import (
-    ACTION_LEVELS,
     ActionRequest,
     DecisionKind,
     PolicyEngine,
 )
-from dsh_company.policy.runtime_profiles import actions_for_runtime_profile
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,7 +149,7 @@ class Selector:
             employee_grant = self._for_action(candidate.employee_grants, action)
             node_grant = self._for_action(candidate.node_grants, action)
             template = workspace_grant or employee_grant or node_grant
-            runtime_grant = self._runtime_grant(
+            runtime_grant = self._policy_engine.runtime_grant(
                 candidate.revision.runtime_profile, action, template
             )
             decision = self._policy_engine.decide(
@@ -189,24 +187,3 @@ class Selector:
     @staticmethod
     def _for_action(grants: tuple[CapabilityGrant, ...], action: str) -> CapabilityGrant | None:
         return next((grant for grant in grants if grant.action == action), None)
-
-    @staticmethod
-    def _runtime_grant(
-        runtime_profile: str,
-        action: str,
-        template: CapabilityGrant | None,
-    ) -> CapabilityGrant | None:
-        if template is None or action not in actions_for_runtime_profile(runtime_profile):
-            return None
-        required_level = ACTION_LEVELS.get(action)
-        if required_level is None:
-            return None
-        return CapabilityGrant(
-            id=CapabilityGrantId(f"runtime:{runtime_profile}:{action}"),
-            employee_revision_id=None,
-            action=action,
-            level=required_level,
-            resource_kind=template.resource_kind,
-            resource_values=("*",),
-            requires_approval=False,
-        )

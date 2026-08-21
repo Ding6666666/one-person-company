@@ -53,19 +53,6 @@ class GrantCreate(BaseModel):
 class WorkspaceCapabilitiesUpdate(BaseModel):
     grants: list[GrantCreate] = Field(max_length=8)
 
-    @model_validator(mode="after")
-    def validate_closed_catalog(self) -> "WorkspaceCapabilitiesUpdate":
-        from dsh_company.domain.policy import ACTION_LEVELS
-
-        actions = [grant.action for grant in self.grants]
-        if len(actions) != len(set(actions)):
-            raise ValueError("capability actions must be unique")
-        for grant in self.grants:
-            required = ACTION_LEVELS.get(grant.action)
-            if required is None or grant.level != int(required):
-                raise ValueError("capability action and level must match the closed catalog")
-        return self
-
 
 class WorkspaceGrant(BaseModel):
     action: str
@@ -120,10 +107,6 @@ class DelegationCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_actions(self) -> "DelegationCreate":
-        from dsh_company.domain.policy import ACTION_LEVELS
-
-        if any(action not in ACTION_LEVELS for action in self.required_actions):
-            raise ValueError("delegation actions must use the closed catalog")
         if len(self.required_actions) != len(set(self.required_actions)):
             raise ValueError("delegation actions must be unique")
         return self
@@ -320,12 +303,8 @@ class GraphNodeInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_policy_inputs(self) -> "GraphNodeInput":
-        from dsh_company.domain.policy import ACTION_LEVELS
-
         if len(self.required_actions) != len(set(self.required_actions)):
             raise ValueError("required actions must be unique")
-        if any(action not in ACTION_LEVELS for action in self.required_actions):
-            raise ValueError("required actions must use the closed catalog")
         if len(self.resource_kinds) != len(self.required_actions):
             raise ValueError("resource kinds must align with required actions")
         return self

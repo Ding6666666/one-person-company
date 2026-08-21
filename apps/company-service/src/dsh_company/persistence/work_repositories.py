@@ -50,6 +50,13 @@ from .work_models import (
     WorkRow,
 )
 
+_TERMINAL_EXECUTION_STATUSES = {
+    ExecutionStatus.BLOCKED.value,
+    ExecutionStatus.CANCELLED.value,
+    ExecutionStatus.COMPLETED.value,
+    ExecutionStatus.FAILED.value,
+}
+
 
 class ConcurrentNodeUpdate(Exception):
     """A node was changed since the caller read its version."""
@@ -382,6 +389,27 @@ class WorkRepository:
             if link_row is None:
                 self._session.add(self._link_row(link))
                 continue
+            if link.status.value not in _TERMINAL_EXECUTION_STATUSES:
+                result = cast(
+                    CursorResult[Any],
+                    self._session.execute(
+                        update(ExecutionLinkRow)
+                        .where(
+                            ExecutionLinkRow.id == link.id,
+                            ExecutionLinkRow.status.not_in(
+                                _TERMINAL_EXECUTION_STATUSES
+                            ),
+                        )
+                        .values(
+                            status=link.status.value,
+                            started_at=link.started_at,
+                            finished_at=link.finished_at,
+                            diagnostic_code=link.diagnostic_code,
+                        )
+                    ),
+                )
+                if result.rowcount == 0:
+                    continue
             link_row.status = link.status.value
             link_row.started_at = link.started_at
             link_row.finished_at = link.finished_at

@@ -5,13 +5,13 @@
   "packageManager": "pnpm@11.7.0",
   "engines": { "node": ">=22.19.0", "pnpm": ">=11.0.0" },
   "scripts": {
-    "build": "pnpm --filter @dsh/company-plugin build",
-    "typecheck": "pnpm --filter @dsh/company-plugin typecheck",
-    "test": "pnpm --filter @dsh/company-plugin test",
-    "check": "pnpm run contracts:test && pnpm --filter @dsh/company-plugin check",
+    "build": "pnpm --filter @dsh/company-plugin build && pnpm --filter @dsh/company-plugin-sdk build",
+    "typecheck": "pnpm --filter @dsh/company-plugin typecheck && pnpm --filter @dsh/company-plugin-sdk typecheck",
+    "test": "pnpm --filter @dsh/company-plugin test && pnpm --filter @dsh/company-plugin-sdk test",
+    "check": "pnpm run contracts:test && pnpm --filter @dsh/company-plugin check && pnpm --filter @dsh/company-plugin-sdk check",
     "contracts:test": "node --test packages/contracts/tests/contract-tools.test.mjs",
     "contracts:capture": "node packages/contracts/scripts/capture-company-service-openapi.mjs --output packages/contracts/openapi/openapi.json --revision-output packages/contracts/openapi/source-revision.json",
-    "contracts:generate": "node packages/contracts/scripts/generate-types.mjs --input packages/contracts/openapi/openapi.json --output apps/dsh-company-plugin/src/contracts/generated/openapi.ts"
+    "contracts:generate": "node packages/contracts/scripts/generate-types.mjs --input packages/contracts/openapi/openapi.json --output apps/dsh-company-plugin/src/contracts/generated/openapi.ts && node packages/contracts/scripts/generate-types.mjs --input packages/contracts/openapi/openapi.json --output packages/company-plugin-sdk/src/generated/openapi.ts"
   },
   "devDependencies": { "openapi-typescript": "7.13.0" }
 }

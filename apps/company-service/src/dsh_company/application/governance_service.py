@@ -6,13 +6,11 @@ from dsh_company.domain.approval import Approval, ApprovalStatus
 from dsh_company.domain.capabilities import CapabilityGrant
 from dsh_company.domain.ids import (
     ApprovalId,
-    CapabilityGrantId,
     CompanyEventId,
     WorkNodeId,
     new_id,
 )
 from dsh_company.domain.policy import (
-    ACTION_LEVELS,
     ActionRequest,
     DecisionKind,
     PolicyDecision,
@@ -26,7 +24,6 @@ from dsh_company.domain.work import (
     WorkNodeStatus,
     project_graph_work_status,
 )
-from dsh_company.policy.runtime_profiles import actions_for_runtime_profile
 
 from .ports import (
     GovernanceUnitOfWork,
@@ -92,9 +89,7 @@ class GovernanceService:
                 raise ValueError("governed action requires a ready work node")
             decision = self._decide(uow, aggregate, command)
             if decision.kind is DecisionKind.DENY:
-                uow.works.update(
-                    self._blocked(aggregate, command.node_id, decision.reason)
-                )
+                uow.works.update(self._blocked(aggregate, command.node_id, decision.reason))
                 uow.commit()
                 return decision
             if decision.kind is DecisionKind.REQUIRE_APPROVAL:
@@ -108,9 +103,7 @@ class GovernanceService:
                     reason=command.reason,
                 )
                 uow.approvals.add(approval)
-                uow.works.update(
-                    self._with_node(aggregate, node.wait_for_approval())
-                )
+                uow.works.update(self._with_node(aggregate, node.wait_for_approval()))
                 uow.commit()
                 return approval
             dispatch = True
@@ -131,9 +124,7 @@ class GovernanceService:
         with self._uow as uow:
             approval = self._require_approval(uow.approvals.get(approval_id), approval_id)
             rejected = approval.reject(decided_by=decided_by.strip())
-            aggregate = self._require_aggregate(
-                uow.works.get_for_node(approval.node_id)
-            )
+            aggregate = self._require_aggregate(uow.works.get_for_node(approval.node_id))
             node = self._require_single_node(aggregate, approval.node_id)
             link = self._require_execution_link(aggregate, node)
             failed = replace(
@@ -185,9 +176,7 @@ class GovernanceService:
             approval = self._require_approval(uow.approvals.get(approval_id), approval_id)
             if approval.status is not ApprovalStatus.APPROVED:
                 raise ValueError("approval is not approved")
-            aggregate = self._require_aggregate(
-                uow.works.get_for_node(approval.node_id)
-            )
+            aggregate = self._require_aggregate(uow.works.get_for_node(approval.node_id))
             node = self._require_single_node(aggregate, approval.node_id)
             self._require_execution_link(aggregate, node)
             if node.status is not WorkNodeStatus.WAITING_APPROVAL:
@@ -203,9 +192,7 @@ class GovernanceService:
             if decision.kind is DecisionKind.DENY:
                 ready = self._with_node(aggregate, ready_node)
                 uow.works.update(ready)
-                uow.works.update(
-                    self._blocked(ready, approval.node_id, decision.reason)
-                )
+                uow.works.update(self._blocked(ready, approval.node_id, decision.reason))
                 uow.commit()
                 return decision
             uow.works.update(self._with_node(aggregate, ready_node))
@@ -225,9 +212,7 @@ class GovernanceService:
         command: GovernedAction,
     ) -> PolicyDecision:
         node = self._require_single_node(aggregate, command.node_id)
-        employee = uow.employees.get_revision(
-            node.assigned_employee_id, node.employee_revision_id
-        )
+        employee = uow.employees.get_revision(node.assigned_employee_id, node.employee_revision_id)
         if employee is None:
             return PolicyDecision(DecisionKind.DENY, "employee_not_found")
         workspace_grant = self._for_action(
@@ -235,10 +220,8 @@ class GovernanceService:
             command.action,
         )
         employee_grant = self._for_action(employee.grants, command.action)
-        node_grant = self._for_action(
-            uow.node_grants.list_for_node(node.id), command.action
-        )
-        runtime_grant = self._runtime_grant(
+        node_grant = self._for_action(uow.node_grants.list_for_node(node.id), command.action)
+        runtime_grant = self._policy_engine.runtime_grant(
             employee.revision.runtime_profile,
             command.action,
             workspace_grant or employee_grant or node_grant,
@@ -261,36 +244,11 @@ class GovernanceService:
         return PolicyDecision(decision.kind, decision.reason, requested)
 
     @staticmethod
-    def _runtime_grant(
-        runtime_profile: str,
-        action: str,
-        resource_template: CapabilityGrant | None,
-    ) -> CapabilityGrant | None:
-        if action not in actions_for_runtime_profile(runtime_profile):
-            return None
-        level = ACTION_LEVELS.get(action)
-        if level is None or resource_template is None:
-            return None
-        return CapabilityGrant(
-            id=CapabilityGrantId(f"runtime:{runtime_profile}:{action}"),
-            employee_revision_id=None,
-            action=action,
-            level=level,
-            resource_kind=resource_template.resource_kind,
-            resource_values=("*",),
-            requires_approval=False,
-        )
-
-    @staticmethod
-    def _for_action(
-        grants: tuple[CapabilityGrant, ...], action: str
-    ) -> CapabilityGrant | None:
+    def _for_action(grants: tuple[CapabilityGrant, ...], action: str) -> CapabilityGrant | None:
         return next((grant for grant in grants if grant.action == action), None)
 
     @classmethod
-    def _blocked(
-        cls, aggregate: WorkAggregate, node_id: WorkNodeId, reason: str
-    ) -> WorkAggregate:
+    def _blocked(cls, aggregate: WorkAggregate, node_id: WorkNodeId, reason: str) -> WorkAggregate:
         node = cls._require_single_node(aggregate, node_id)
         link = cls._require_execution_link(aggregate, node)
         if node.status is not WorkNodeStatus.READY:
@@ -318,18 +276,14 @@ class GovernanceService:
         return aggregate
 
     @staticmethod
-    def _require_single_node(
-        aggregate: WorkAggregate, node_id: WorkNodeId
-    ) -> WorkNode:
+    def _require_single_node(aggregate: WorkAggregate, node_id: WorkNodeId) -> WorkNode:
         matching = tuple(node for node in aggregate.nodes if node.id == node_id)
         if len(matching) != 1:
             raise LookupError("work node not found")
         return matching[0]
 
     @staticmethod
-    def _require_execution_link(
-        aggregate: WorkAggregate, node: WorkNode
-    ) -> ExecutionLink:
+    def _require_execution_link(aggregate: WorkAggregate, node: WorkNode) -> ExecutionLink:
         matching = tuple(
             link
             for link in aggregate.execution_links
@@ -355,15 +309,12 @@ class GovernanceService:
         return replace(
             aggregate,
             nodes=tuple(
-                replacement if node.id == replacement.id else node
-                for node in aggregate.nodes
+                replacement if node.id == replacement.id else node for node in aggregate.nodes
             ),
         )
 
     @staticmethod
-    def _with_link(
-        aggregate: WorkAggregate, replacement: ExecutionLink
-    ) -> WorkAggregate:
+    def _with_link(aggregate: WorkAggregate, replacement: ExecutionLink) -> WorkAggregate:
         return replace(
             aggregate,
             execution_links=tuple(
@@ -373,9 +324,7 @@ class GovernanceService:
         )
 
     @staticmethod
-    def _require_approval(
-        approval: Approval | None, approval_id: ApprovalId
-    ) -> Approval:
+    def _require_approval(approval: Approval | None, approval_id: ApprovalId) -> Approval:
         if approval is None:
             raise LookupError(f"approval not found: {approval_id}")
         return approval

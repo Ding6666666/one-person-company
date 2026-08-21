@@ -14,7 +14,6 @@ from dsh_company.domain.ids import (
     ApprovalId,
     ArtifactReferenceId,
     AttemptId,
-    CapabilityGrantId,
     ExecutionLinkId,
     WorkGraphRevisionId,
     WorkId,
@@ -22,7 +21,6 @@ from dsh_company.domain.ids import (
     new_id,
 )
 from dsh_company.domain.policy import (
-    ACTION_LEVELS,
     ActionRequest,
     DecisionKind,
     PolicyDecision,
@@ -37,7 +35,6 @@ from dsh_company.domain.work import (
     WorkNodeStatus,
     project_graph_work_status,
 )
-from dsh_company.policy.runtime_profiles import actions_for_runtime_profile
 
 _TERMINAL_NODE_STATUSES = {
     WorkNodeStatus.COMPLETED,
@@ -82,10 +79,7 @@ class DurableGraphEngine:
                 raise LookupError("work graph revision not found")
             graph, _ = revision
             aggregate = uow.works.get(graph.work_id)
-            if (
-                aggregate is None
-                or aggregate.work.current_graph_revision_id != graph_revision_id
-            ):
+            if aggregate is None or aggregate.work.current_graph_revision_id != graph_revision_id:
                 raise ValueError("only the current graph revision can be started")
         self.reconcile(graph.work_id)
 
@@ -115,10 +109,7 @@ class DurableGraphEngine:
             aggregate = self._require_aggregate(uow.works.get_for_node(node_id))
             node = self._node(aggregate, node_id)
             link = self._link(aggregate, node_id, attempt_id)
-            if (
-                node.status is WorkNodeStatus.COMPLETED
-                and link.status is ExecutionStatus.COMPLETED
-            ):
+            if node.status is WorkNodeStatus.COMPLETED and link.status is ExecutionStatus.COMPLETED:
                 work_id = aggregate.work.id
             else:
                 completed_node = node.complete(attempt_id, result_reference)
@@ -134,9 +125,7 @@ class DurableGraphEngine:
                 work_id = updated.work.id
         self.reconcile(work_id)
 
-    def record_failure(
-        self, node_id: WorkNodeId, attempt_id: AttemptId, reason: str
-    ) -> None:
+    def record_failure(self, node_id: WorkNodeId, attempt_id: AttemptId, reason: str) -> None:
         failure_code = reason if reason in _CLOSED_FAILURE_CODES else "runtime_error"
         with self._uow_factory() as uow:
             aggregate = self._require_aggregate(uow.works.get_for_node(node_id))
@@ -176,8 +165,7 @@ class DurableGraphEngine:
             aggregate = self._require_aggregate(uow.works.get(work_id))
             capacity = max(
                 0,
-                self._runtime_concurrency
-                - uow.works.count_active_execution_links(),
+                self._runtime_concurrency - uow.works.count_active_execution_links(),
             )
             nodes = list(aggregate.nodes)
             links = list(aggregate.execution_links)
@@ -269,9 +257,7 @@ class DurableGraphEngine:
         node: WorkNode,
     ) -> "_Eligibility":
         by_id = {item.id: item for item in aggregate.nodes}
-        incoming = tuple(
-            edge for edge in aggregate.graph.edges if edge.to_node_id == node.id
-        )
+        incoming = tuple(edge for edge in aggregate.graph.edges if edge.to_node_id == node.id)
         inputs = list(node.input_references)
         for kind in WorkEdgeKind:
             edges = tuple(edge for edge in incoming if edge.kind is kind)
@@ -319,20 +305,16 @@ class DurableGraphEngine:
     ) -> PolicyDecision:
         if not node.required_actions:
             return PolicyDecision(DecisionKind.ALLOW, "granted")
-        employee = uow.employees.get_revision(
-            node.assigned_employee_id, node.employee_revision_id
-        )
+        employee = uow.employees.get_revision(node.assigned_employee_id, node.employee_revision_id)
         if employee is None:
             return PolicyDecision(DecisionKind.DENY, "employee_not_found")
-        workspace_grants = uow.workspace_grants.list_for_workspace(
-            aggregate.work.workspace_id
-        )
+        workspace_grants = uow.workspace_grants.list_for_workspace(aggregate.work.workspace_id)
         node_grants = uow.node_grants.list_for_node(node.id)
         for action in node.required_actions:
             workspace_grant = self._for_action(workspace_grants, action)
             employee_grant = self._for_action(employee.grants, action)
             node_grant = self._for_action(node_grants, action)
-            runtime_grant = self._runtime_grant(
+            runtime_grant = self._policy_engine.runtime_grant(
                 employee.revision.runtime_profile,
                 action,
                 workspace_grant or employee_grant or node_grant,
@@ -364,31 +346,8 @@ class DurableGraphEngine:
         return PolicyDecision(DecisionKind.ALLOW, "granted")
 
     @staticmethod
-    def _for_action(
-        grants: tuple[CapabilityGrant, ...], action: str
-    ) -> CapabilityGrant | None:
+    def _for_action(grants: tuple[CapabilityGrant, ...], action: str) -> CapabilityGrant | None:
         return next((grant for grant in grants if grant.action == action), None)
-
-    @staticmethod
-    def _runtime_grant(
-        runtime_profile: str,
-        action: str,
-        template: CapabilityGrant | None,
-    ) -> CapabilityGrant | None:
-        if action not in actions_for_runtime_profile(runtime_profile):
-            return None
-        level = ACTION_LEVELS.get(action)
-        if level is None or template is None:
-            return None
-        return CapabilityGrant(
-            id=CapabilityGrantId(f"runtime:{runtime_profile}:{action}"),
-            employee_revision_id=None,
-            action=action,
-            level=level,
-            resource_kind=template.resource_kind,
-            resource_values=("*",),
-            requires_approval=False,
-        )
 
     @staticmethod
     def _block_without_attempt(node: WorkNode, reason: str) -> WorkNode:
@@ -408,15 +367,10 @@ class DurableGraphEngine:
         node: WorkNode,
         uow: GovernanceUnitOfWork,
     ) -> ExecutionLink:
-        employee = uow.employees.get_revision(
-            node.assigned_employee_id, node.employee_revision_id
-        )
+        employee = uow.employees.get_revision(node.assigned_employee_id, node.employee_revision_id)
         if employee is None:
             raise RuntimeError("frozen employee revision not found")
-        stem = (
-            f"{aggregate.work.id}:{aggregate.graph.id}:"
-            f"{node.id}:attempt-{node.attempt_count}"
-        )
+        stem = f"{aggregate.work.id}:{aggregate.graph.id}:{node.id}:attempt-{node.attempt_count}"
         return ExecutionLink.dispatch(
             execution_link_id=ExecutionLinkId(f"{stem}:link"),
             attempt_id=AttemptId(stem),
@@ -459,21 +413,15 @@ class DurableGraphEngine:
         return matches[0]
 
     @staticmethod
-    def _replace_node(
-        aggregate: WorkAggregate, replacement: WorkNode
-    ) -> tuple[WorkNode, ...]:
-        return tuple(
-            replacement if item.id == replacement.id else item
-            for item in aggregate.nodes
-        )
+    def _replace_node(aggregate: WorkAggregate, replacement: WorkNode) -> tuple[WorkNode, ...]:
+        return tuple(replacement if item.id == replacement.id else item for item in aggregate.nodes)
 
     @staticmethod
     def _replace_link(
         aggregate: WorkAggregate, replacement: ExecutionLink
     ) -> tuple[ExecutionLink, ...]:
         return tuple(
-            replacement if item.id == replacement.id else item
-            for item in aggregate.execution_links
+            replacement if item.id == replacement.id else item for item in aggregate.execution_links
         )
 
 

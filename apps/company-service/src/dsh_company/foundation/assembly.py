@@ -5,12 +5,14 @@ from fastapi import APIRouter
 
 from dsh_company.api.company import router as company_router
 from dsh_company.api.governance import router as governance_router
+from dsh_company.api.plugins import router as plugins_router
 from dsh_company.api.work import router as work_router
 from dsh_company.application.delegation_service import DelegationService
 from dsh_company.application.governance_service import GovernanceService
 from dsh_company.application.ports import WorkCoordinator, WorkUnitOfWork
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
 from dsh_company.application.runtime_governance import RuntimeGovernanceHandler
+from dsh_company.business_plugins.registry import BusinessPluginRegistry
 from dsh_company.domain.ids import (
     ArtifactReferenceId,
     AttemptId,
@@ -72,9 +74,7 @@ class _UnconfiguredOrchestrationEngine:
         del node_id, attempt_id, result_reference
         raise RuntimeError("orchestration engine is not configured")
 
-    def record_failure(
-        self, node_id: WorkNodeId, attempt_id: AttemptId, reason: str
-    ) -> None:
+    def record_failure(self, node_id: WorkNodeId, attempt_id: AttemptId, reason: str) -> None:
         del node_id, attempt_id, reason
         raise RuntimeError("orchestration engine is not configured")
 
@@ -101,6 +101,7 @@ def _company_router() -> APIRouter:
     router.include_router(company_router)
     router.include_router(work_router)
     router.include_router(governance_router)
+    router.include_router(plugins_router)
     return router
 
 
@@ -144,10 +145,9 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
         def uow_factory() -> SqlAlchemyUnitOfWork:
             return SqlAlchemyUnitOfWork(engine)
 
-        governance_handler = RuntimeGovernanceHandler(
-            uow_factory,
-            PolicyEngine(),
-        )
+        action_catalog = BusinessPluginRegistry(uow_factory).action_catalog
+        policy_engine = PolicyEngine(action_catalog)
+        governance_handler = RuntimeGovernanceHandler(uow_factory, policy_engine)
         terminal_observer = _TerminalObserverProxy()
         coordinator = RuntimeCoordinator(
             uow_factory,
@@ -159,6 +159,7 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
         orchestration_engine = DurableGraphEngine(
             uow_factory,
             coordinator,
+            policy_engine=policy_engine,
             runtime_concurrency=settings.runtime_concurrency,
         )
         terminal_observer.target = orchestration_engine
@@ -166,13 +167,13 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
         def governance_service_factory() -> GovernanceService:
             return GovernanceService(
                 uow_factory(),
-                PolicyEngine(),
+                policy_engine,
                 coordinator,
                 terminal_observer=terminal_observer,
             )
 
         def delegation_service_factory() -> DelegationService:
-            return DelegationService(uow_factory(), PolicyEngine(), coordinator)
+            return DelegationService(uow_factory(), policy_engine, coordinator)
     except BaseException:
         engine.dispose()
         raise

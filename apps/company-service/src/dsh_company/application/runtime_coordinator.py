@@ -1,8 +1,9 @@
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime
-from threading import Lock
+from threading import Condition, Lock
+from time import monotonic
 from typing import Protocol
 
 from dsh_company.domain.ids import (
@@ -89,12 +90,38 @@ class RuntimeCoordinator:
         self._shutdown_started = False
         self._node_locks_lock = Lock()
         self._node_locks: dict[WorkNodeId, Lock] = {}
+        self._idle_condition = Condition()
+        self._pending_dispatches = 0
 
     def enqueue(self, node_id: WorkNodeId) -> None:
         with self._lifecycle_lock:
             if not self._accepting:
                 raise RuntimeError("runtime coordinator is shutting down")
-            self._executor.submit(self.dispatch, node_id)
+            with self._idle_condition:
+                self._pending_dispatches += 1
+            try:
+                future = self._executor.submit(self.dispatch, node_id)
+            except BaseException:
+                with self._idle_condition:
+                    self._pending_dispatches -= 1
+                    self._idle_condition.notify_all()
+                raise
+            future.add_done_callback(self._dispatch_finished)
+
+    def _dispatch_finished(self, _future: Future[None]) -> None:
+        with self._idle_condition:
+            self._pending_dispatches -= 1
+            self._idle_condition.notify_all()
+
+    def wait_for_idle(self, *, timeout_seconds: float) -> bool:
+        deadline = monotonic() + timeout_seconds
+        with self._idle_condition:
+            while self._pending_dispatches:
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    return False
+                self._idle_condition.wait(timeout=remaining)
+            return True
 
     def dispatch(self, node_id: WorkNodeId) -> None:
         node_lock = self._node_lock(node_id)
@@ -274,14 +301,14 @@ class RuntimeCoordinator:
             self._started = True
 
         with self._uow_factory() as uow:
-            running_node_ids = tuple(
-                link.node_id
+            running_attempts = tuple(
+                (link.node_id, link.attempt_id)
                 for aggregate in uow.works.list_running()
                 for link in aggregate.execution_links
                 if link.status is ExecutionStatus.RUNNING
             )
-        for node_id in running_node_ids:
-            self._block_runtime_process_lost(node_id)
+        for node_id, attempt_id in running_attempts:
+            self._block_runtime_process_lost(node_id, attempt_id)
 
         if self._governance_handler is not None:
             try:
@@ -321,7 +348,12 @@ class RuntimeCoordinator:
         with self._uow_factory() as uow:
             aggregate = self._require_node(uow.works.get_for_node(node_id), node_id)
             node = self._node(aggregate, node_id)
-            if node.status is not WorkNodeStatus.READY:
+            retry_reconciliation = (
+                node.status is WorkNodeStatus.BLOCKED
+                and node.failure_code == "runtime_process_lost"
+                and node.attempt_count <= node.max_attempts
+            )
+            if node.status is not WorkNodeStatus.READY and not retry_reconciliation:
                 return None
             link = self._pending_link(aggregate, node_id)
             employee = uow.employees.get_revision(
@@ -330,15 +362,27 @@ class RuntimeCoordinator:
             if employee is None:
                 raise RuntimeError("frozen employee revision not found")
             running_link = link.mark_running()
-            running_work = (
-                aggregate.work.start()
-                if aggregate.work.status is WorkStatus.QUEUED
-                else aggregate.work
+            if aggregate.work.status is WorkStatus.QUEUED:
+                running_work = aggregate.work.start()
+            elif retry_reconciliation:
+                running_work = replace(aggregate.work, status=WorkStatus.RUNNING)
+            else:
+                running_work = aggregate.work
+            running_node = (
+                replace(
+                    node,
+                    status=WorkNodeStatus.RUNNING,
+                    active_attempt_id=link.attempt_id,
+                    failure_code=None,
+                    version=node.version + 1,
+                )
+                if retry_reconciliation
+                else node.start(link.attempt_id)
             )
             running = replace(
                 aggregate,
                 work=running_work,
-                nodes=self._replace_node(aggregate, node.start(link.attempt_id)),
+                nodes=self._replace_node(aggregate, running_node),
                 execution_links=self._replace_link(aggregate, running_link),
             )
             uow.works.update(running)
@@ -562,13 +606,18 @@ class RuntimeCoordinator:
         except Exception:
             _LOGGER.exception("Company graph terminal reconciliation failed")
 
-    def _block_runtime_process_lost(self, node_id: WorkNodeId) -> None:
+    def _block_runtime_process_lost(
+        self, node_id: WorkNodeId, scanned_attempt_id: AttemptId
+    ) -> None:
         with self._node_lock(node_id):
             with self._uow_factory() as uow:
                 aggregate = self._require_node(uow.works.get_for_node(node_id), node_id)
                 node = self._node(aggregate, node_id)
-                link = self._current_link(aggregate, node)
-                if link.status is not ExecutionStatus.RUNNING:
+                link = self._link_for_attempt(aggregate, node_id, scanned_attempt_id)
+                if (
+                    link.status is not ExecutionStatus.RUNNING
+                    or node.active_attempt_id != scanned_attempt_id
+                ):
                     return
                 blocked = replace(
                     aggregate,

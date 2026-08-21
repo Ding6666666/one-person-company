@@ -26,6 +26,7 @@ class _ModelServer(ThreadingHTTPServer):
     requests: list[ModelRequest]
     hold_marker: str | None
     held_request: HeldModelRequest | None
+    unavailable_markers: set[str]
 
 
 def _request_marker(body: dict[str, Any]) -> str:
@@ -47,6 +48,12 @@ class _ModelHandler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length).decode("utf-8"))
         session_marker = _request_marker(body)
         self.server.requests.append(ModelRequest(body=body, marker=session_marker))
+        if any(marker in session_marker for marker in self.server.unavailable_markers):
+            self.send_response(503)
+            self.send_header("content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":{"message":"keyless endpoint unavailable"}}')
+            return
         if (
             self.server.hold_marker is not None
             and self.server.hold_marker in json.dumps(body)
@@ -77,6 +84,7 @@ class KeylessModelEndpoint:
         self._server.requests = []
         self._server.hold_marker = None
         self._server.held_request = None
+        self._server.unavailable_markers = set()
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             name="dsh-company-keyless-endpoint",
@@ -112,3 +120,6 @@ class KeylessModelEndpoint:
         self._server.hold_marker = marker
         self._server.held_request = held
         return held
+
+    def make_unavailable(self, marker: str) -> None:
+        self._server.unavailable_markers.add(marker)

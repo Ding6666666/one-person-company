@@ -12,6 +12,7 @@ class ClosableHarness(Protocol):
 
 
 HarnessT = TypeVar("HarnessT", bound=ClosableHarness)
+ResultT = TypeVar("ResultT")
 
 
 class _AttemptHandle:
@@ -33,6 +34,12 @@ class _AttemptHandle:
                 raise
             self._close_succeeded = True
             return True
+
+    def start_unless_closed(self, starter: Callable[[], ResultT]) -> ResultT:
+        with self._close_lock:
+            if self._close_started:
+                raise RuntimeError("runtime attempt is already closed")
+            return starter()
 
 
 class RuntimeSupervisor:
@@ -67,6 +74,18 @@ class RuntimeSupervisor:
         if handle is None:
             return GatewayCancelResult(requested=True, runtime_closed=False)
         return GatewayCancelResult(requested=True, runtime_closed=handle.close_once())
+
+    def start(
+        self,
+        attempt_id: AttemptId,
+        harness: ClosableHarness,
+        starter: Callable[[], ResultT],
+    ) -> ResultT:
+        with self._lock:
+            handle = self._active.get(attempt_id)
+        if handle is None or handle.harness is not harness:
+            raise ValueError(f"attempt {attempt_id} does not own the supplied harness")
+        return handle.start_unless_closed(starter)
 
     def finish(self, attempt_id: AttemptId, harness: ClosableHarness) -> None:
         with self._lock:

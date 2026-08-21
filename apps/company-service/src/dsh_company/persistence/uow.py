@@ -10,6 +10,7 @@ from .governance_repositories import (
     NodeCapabilityGrantRepository,
     WorkspaceCapabilityGrantRepository,
 )
+from .plugin_repositories import BusinessPluginRepository
 from .repositories import EmployeeRepository, WorkspaceRepository
 from .work_repositories import CompanyEventRepository, WorkRepository
 
@@ -23,6 +24,7 @@ class SqlAlchemyUnitOfWork:
     node_grants: NodeCapabilityGrantRepository
     approvals: ApprovalRepository
     delegations: DelegationRepository
+    business_plugins: BusinessPluginRepository
 
     def __init__(self, engine: Engine) -> None:
         self._session_factory = sessionmaker(engine, expire_on_commit=False)
@@ -40,6 +42,7 @@ class SqlAlchemyUnitOfWork:
         self.node_grants = NodeCapabilityGrantRepository(self._session)
         self.approvals = ApprovalRepository(self._session)
         self.delegations = DelegationRepository(self._session)
+        self.business_plugins = BusinessPluginRepository(self._session)
         return self
 
     def commit(self) -> None:

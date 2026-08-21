@@ -9,7 +9,11 @@ import pytest
 from deepseek_harness import Notification
 from dsh_company.domain.ids import AttemptId, EmployeeId, EmployeeRevisionId
 from dsh_company.dsh_gateway.adapter import PublicSdkDshGateway
-from dsh_company.dsh_gateway.contracts import EmployeeRuntimeSnapshot, GatewaySubmission
+from dsh_company.dsh_gateway.contracts import (
+    EmployeeRuntimeSnapshot,
+    GatewayCancelResult,
+    GatewaySubmission,
+)
 from dsh_company.dsh_gateway.control_requests import ApprovalControlRequest
 from dsh_company.dsh_gateway.supervisor import RuntimeSupervisor
 
@@ -375,3 +379,56 @@ def test_shutdown_barrier_rejects_new_harness_creation(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="shutting down"):
         gateway.submit(submission(), on_event=lambda event: None)
     assert factory.create_calls == 0
+
+
+def test_supervisor_does_not_start_a_harness_after_cancel_wins() -> None:
+    supervisor = RuntimeSupervisor()
+    harness = FakeHarness(FakeHarnessFactory(), {})
+    attempt_id = AttemptId("attempt-start-cancelled")
+    supervisor.register(attempt_id, harness)
+
+    cancelled = supervisor.cancel(attempt_id)
+
+    with pytest.raises(RuntimeError, match="already closed"):
+        supervisor.start(attempt_id, harness, lambda: harness.start_session("session-1"))
+    supervisor.finish(attempt_id, harness)
+
+    assert cancelled.runtime_closed is True
+    assert harness.factory.close_calls == ["None"]
+    assert harness.session_id is None
+
+
+def test_supervisor_serializes_runtime_start_before_cancel() -> None:
+    supervisor = RuntimeSupervisor()
+    harness = FakeHarness(FakeHarnessFactory(), {})
+    attempt_id = AttemptId("attempt-start-first")
+    supervisor.register(attempt_id, harness)
+    start_entered = Event()
+    release_start = Event()
+    started: list[FakeSession] = []
+
+    def start_runtime() -> FakeSession:
+        start_entered.set()
+        assert release_start.wait(timeout=5)
+        return harness.start_session("session-1")
+
+    start_worker = Thread(
+        target=lambda: started.append(
+            supervisor.start(attempt_id, harness, start_runtime)
+        )
+    )
+    start_worker.start()
+    assert start_entered.wait(timeout=5)
+    cancel_results: list[GatewayCancelResult] = []
+    cancel_worker = Thread(target=lambda: cancel_results.append(supervisor.cancel(attempt_id)))
+    cancel_worker.start()
+
+    assert cancel_results == []
+    release_start.set()
+    start_worker.join(timeout=5)
+    cancel_worker.join(timeout=5)
+    supervisor.finish(attempt_id, harness)
+
+    assert len(started) == 1
+    assert cancel_results == [GatewayCancelResult(requested=True, runtime_closed=True)]
+    assert harness.factory.close_calls == ["None"]

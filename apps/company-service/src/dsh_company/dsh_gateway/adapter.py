@@ -118,7 +118,11 @@ class PublicSdkDshGateway:
             on_event(project_notification(submission.attempt_id, event_count, notification))
 
         try:
-            session = harness.start_session(submission.employee.dsh_session_id)
+            session = self._supervisor.start(
+                submission.attempt_id,
+                harness,
+                lambda: harness.start_session(submission.employee.dsh_session_id),
+            )
             result = session.run(_prompt(submission), on_notification=receive)
             try:
                 control_request = parse_control_request(result.final_response)

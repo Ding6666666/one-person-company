@@ -15,7 +15,7 @@ def test_python_workspace_contains_only_the_company_service() -> None:
     ]
 
 
-def test_node_workspace_contains_only_the_company_plugin() -> None:
+def test_node_workspace_contains_only_company_products() -> None:
     workspace_lines = [
         line.strip()
         for line in (ROOT / "pnpm-workspace.yaml").read_text(encoding="utf-8").splitlines()
@@ -24,9 +24,17 @@ def test_node_workspace_contains_only_the_company_plugin() -> None:
     plugin_package = json.loads(
         (ROOT / "apps/dsh-company-plugin/package.json").read_text(encoding="utf-8")
     )
+    sdk_package = json.loads(
+        (ROOT / "packages/company-plugin-sdk/package.json").read_text(encoding="utf-8")
+    )
 
-    assert workspace_lines == ["- apps/dsh-company-plugin"]
+    assert workspace_lines == [
+        "- apps/dsh-company-plugin",
+        "- packages/company-plugin-sdk",
+    ]
     assert plugin_package["name"] == "@dsh/company-plugin"
+    assert sdk_package["name"] == "@dsh/company-plugin-sdk"
+    assert sdk_package.get("dependencies", {}) == {}
 
 
 def test_dsh_submodule_uses_the_pinned_vendor_location() -> None:

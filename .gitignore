@@ -12,6 +12,8 @@
 **/node_modules/
 apps/dsh-company-plugin/dist/
 apps/dsh-company-plugin/lib/
+packages/company-plugin-sdk/dist/
+packages/company-plugin-sdk/lib/
 .coverage
 coverage/
 htmlcov/

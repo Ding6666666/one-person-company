@@ -38,6 +38,10 @@ describe('Company loopback transport', () => {
     ['POST', '/approvals/approval-1/reject'],
     ['GET', '/works/work-1/delegations'],
     ['POST', '/works/work-1/delegations'],
+    ['POST', '/business-plugins/register'],
+    ['GET', '/business-plugins'],
+    ['GET', '/business-plugins/content-studio/templates'],
+    ['POST', '/workspaces/ws-1/templates/content-studio/campaign/instantiate'],
   ] as const)('allows %s %s from the generated company contract', async (method, path) => {
     const fetch = vi.fn(async () => new Response('{}', { status: 200 }))
     const remote = createLoopbackTransport({ baseUrl: 'http://127.0.0.1:43123', fetch })

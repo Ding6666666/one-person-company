@@ -1,0 +1,58 @@
+{
+  "plugin_id": "content-studio",
+  "version": "0.1.0",
+  "display_name": "内容工作室",
+  "capability_actions": [
+    {
+      "action": "content-studio.publish_draft",
+      "level": 3,
+      "runtime_profiles": ["workspace_write"]
+    }
+  ],
+  "templates": [
+    {
+      "template_id": "research-write-review-summary",
+      "display_name": "调研→撰写→审核→汇总",
+      "employee_slots": [
+        { "slot_id": "researcher" },
+        { "slot_id": "writer" },
+        { "slot_id": "reviewer" },
+        { "slot_id": "summarizer" }
+      ],
+      "nodes": [
+        {
+          "key": "research",
+          "employee_slot": "researcher",
+          "objective": "调研主题并整理可引用证据",
+          "acceptance_criteria": ["结论均附来源", "区分事实与推断"]
+        },
+        {
+          "key": "write",
+          "employee_slot": "writer",
+          "objective": "基于调研结果撰写初稿",
+          "acceptance_criteria": ["覆盖全部证据", "结构清晰且可审核"]
+        },
+        {
+          "key": "review",
+          "employee_slot": "reviewer",
+          "objective": "审核初稿并列出必要修订",
+          "acceptance_criteria": ["逐项核对证据", "明确通过或修订意见"]
+        },
+        {
+          "key": "summary",
+          "employee_slot": "summarizer",
+          "objective": "汇总审核结果与最终内容",
+          "acceptance_criteria": ["保留分歧与限制", "形成可发布摘要"],
+          "required_actions": ["content-studio.publish_draft"],
+          "resource_kinds": ["content"],
+          "resource_values": ["draft"]
+        }
+      ],
+      "edges": [
+        { "from_key": "research", "to_key": "write", "kind": "depends_on" },
+        { "from_key": "write", "to_key": "review", "kind": "reviews" },
+        { "from_key": "review", "to_key": "summary", "kind": "summarizes" }
+      ]
+    }
+  ]
+}

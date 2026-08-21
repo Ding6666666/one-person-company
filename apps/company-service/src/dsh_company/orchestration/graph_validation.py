@@ -1,7 +1,7 @@
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 
 from dsh_company.domain.ids import WorkNodeId
-from dsh_company.domain.policy import ACTION_LEVELS
+from dsh_company.domain.policy import ACTION_LEVELS, ActionCatalog
 from dsh_company.domain.work import (
     ArtifactReference,
     WorkGraphRevision,
@@ -15,8 +15,17 @@ class InvalidGraph(ValueError):
 
 
 class GraphValidator:
-    def __init__(self, action_catalog: Collection[str] = ACTION_LEVELS.keys()) -> None:
-        self._action_catalog = frozenset(action_catalog)
+    def __init__(
+        self,
+        action_catalog: Collection[str] | ActionCatalog | Callable[[], ActionCatalog] | None = None,
+    ) -> None:
+        self._action_catalog = ACTION_LEVELS.keys() if action_catalog is None else action_catalog
+
+    def _actions(self) -> frozenset[str]:
+        value = self._action_catalog() if callable(self._action_catalog) else self._action_catalog
+        if isinstance(value, ActionCatalog):
+            return value.actions
+        return frozenset(value)
 
     def validate(
         self,
@@ -42,10 +51,7 @@ class GraphValidator:
 
         known_node_ids = set(graph.node_ids)
         for edge in graph.edges:
-            if (
-                edge.from_node_id not in known_node_ids
-                or edge.to_node_id not in known_node_ids
-            ):
+            if edge.from_node_id not in known_node_ids or edge.to_node_id not in known_node_ids:
                 raise InvalidGraph("unknown_edge_endpoint")
             if edge.from_node_id == edge.to_node_id:
                 raise InvalidGraph("self_edge")
@@ -87,7 +93,7 @@ class GraphValidator:
             ):
                 raise InvalidGraph("invalid_attempt_bounds")
             unknown_actions = sorted(
-                action for action in node.required_actions if action not in self._action_catalog
+                action for action in node.required_actions if action not in self._actions()
             )
             if unknown_actions:
                 raise InvalidGraph(f"unknown_required_action: {unknown_actions[0]}")
@@ -121,11 +127,15 @@ class GraphValidator:
         )
         candidate_by_id = {node.id: node for node in candidate_nodes}
         for previous_node in previous_nodes:
-            if previous_node.status in {
-                WorkNodeStatus.COMPLETED,
-                WorkNodeStatus.FAILED,
-                WorkNodeStatus.CANCELLED,
-            } and candidate_by_id.get(previous_node.id) != previous_node:
+            if (
+                previous_node.status
+                in {
+                    WorkNodeStatus.COMPLETED,
+                    WorkNodeStatus.FAILED,
+                    WorkNodeStatus.CANCELLED,
+                }
+                and candidate_by_id.get(previous_node.id) != previous_node
+            ):
                 raise InvalidGraph(f"completed_node_changed: {previous_node.id}")
 
     @staticmethod

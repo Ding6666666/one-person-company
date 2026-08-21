@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request, status
 from dsh_company.application.ports import DuplicateCommand, WorkAggregate
 from dsh_company.application.work_commands import CreateDirectWork
 from dsh_company.application.work_service import WorkService
+from dsh_company.business_plugins.registry import BusinessPluginRegistry
 from dsh_company.domain.capabilities import CapabilityGrant
 from dsh_company.domain.ids import (
     CapabilityGrantId,
@@ -15,8 +16,9 @@ from dsh_company.domain.ids import (
     WorkspaceId,
     new_id,
 )
+from dsh_company.domain.policy import PolicyEngine
 from dsh_company.domain.work import Work, WorkStatus
-from dsh_company.orchestration.graph_validation import InvalidGraph
+from dsh_company.orchestration.graph_validation import GraphValidator, InvalidGraph
 from dsh_company.orchestration.selector import EligibleEmployee, EmployeeCandidate, Selector
 from dsh_company.orchestration.strategies import (
     ExplicitEdge,
@@ -68,10 +70,11 @@ def create_work(
 ) -> WorkProjection:
     if isinstance(body, DirectWorkCreate):
         return _create_legacy_direct(workspace_id, body, service)
-    aggregate, created = _create_strategy_work(request, WorkspaceId(workspace_id), body)
-    if created:
-        request.app.state.assembly.orchestration_engine.start(aggregate.graph.id)
-        aggregate = service.get(aggregate.work.id)
+    aggregate, _created = _create_strategy_work(request, WorkspaceId(workspace_id), body)
+    # Starting the persisted current graph is idempotent.  A repeated command is
+    # also the public, explicit retry signal for a retryable blocked attempt.
+    request.app.state.assembly.orchestration_engine.start(aggregate.graph.id)
+    aggregate = service.get(aggregate.work.id)
     return WorkProjection.from_aggregate(aggregate)
 
 
@@ -98,6 +101,22 @@ def _create_strategy_work(
 ) -> tuple[WorkAggregate, bool]:
     uow_factory = request.app.state.assembly.uow_factory
     normalized_command_id = body.command_id.strip()
+    action_catalog = BusinessPluginRegistry(uow_factory).action_catalog()
+    if isinstance(body, GraphStrategyInput):
+        unknown_action = next(
+            (
+                action
+                for node in body.nodes
+                for action in node.required_actions
+                if action not in action_catalog.actions
+            ),
+            None,
+        )
+        if unknown_action is not None:
+            raise UnprocessableEntityError(
+                "invalid_work_strategy", f"unknown required action: {unknown_action}"
+            )
+    policy_engine = PolicyEngine(action_catalog)
     try:
         with uow_factory() as uow:
             if uow.workspaces.get(workspace_id) is None:
@@ -127,7 +146,13 @@ def _create_strategy_work(
                 current_graph_revision_id=WorkGraphRevisionId(new_id("work-graph")),
                 created_at=datetime.now(UTC),
             )
-            aggregate = _build_strategy(work, body, candidates)
+            aggregate = _build_strategy(
+                work,
+                body,
+                candidates,
+                policy_engine,
+                GraphValidator(action_catalog),
+            )
             uow.works.add(aggregate)
             if isinstance(body, GraphStrategyInput):
                 for node, node_input in zip(aggregate.nodes, body.nodes, strict=True):
@@ -156,14 +181,18 @@ def _create_strategy_work(
 
 
 def _build_strategy(
-    work: Work, body: StrategyWorkCreate, candidates: tuple[EmployeeCandidate, ...]
+    work: Work,
+    body: StrategyWorkCreate,
+    candidates: tuple[EmployeeCandidate, ...],
+    policy_engine: PolicyEngine,
+    graph_validator: GraphValidator,
 ) -> WorkAggregate:
-    factory = StrategyFactory()
+    factory = StrategyFactory(graph_validator)
     criteria = tuple(body.acceptance_criteria)
     if isinstance(body, DirectStrategyInput):
         return factory.direct(
             work=work,
-            participant=_select_one(work, candidates, body.employee_id),
+            participant=_select_one(work, candidates, body.employee_id, policy_engine),
             objective=body.objective,
             criteria=criteria,
         )
@@ -171,20 +200,20 @@ def _build_strategy(
         return factory.battle(
             work=work,
             participants=tuple(
-                _select_one(work, candidates, employee_id)
+                _select_one(work, candidates, employee_id, policy_engine)
                 for employee_id in body.participant_employee_ids
             ),
-            summarizer=_select_one(work, candidates, body.summarizer_employee_id),
+            summarizer=_select_one(work, candidates, body.summarizer_employee_id, policy_engine),
             objective=body.objective,
             criteria=criteria,
         )
     if isinstance(body, StarStrategyInput):
         return factory.star(
             work=work,
-            coordinator=_select_one(work, candidates, body.coordinator_employee_id),
+            coordinator=_select_one(work, candidates, body.coordinator_employee_id, policy_engine),
             children=tuple(
                 StarChild(
-                    participant=_select_one(work, candidates, child.employee_id),
+                    participant=_select_one(work, candidates, child.employee_id, policy_engine),
                     objective=child.objective,
                     criteria=tuple(child.acceptance_criteria),
                 )
@@ -199,7 +228,7 @@ def _build_strategy(
         nodes=tuple(
             ExplicitNode(
                 key=node.key,
-                participant=_select_graph_employee(work, candidates, node),
+                participant=_select_graph_employee(work, candidates, node, policy_engine),
                 objective=node.objective,
                 criteria=tuple(node.acceptance_criteria),
                 max_attempts=node.max_attempts,
@@ -213,13 +242,19 @@ def _build_strategy(
 
 
 def _select_one(
-    work: Work, candidates: tuple[EmployeeCandidate, ...], employee_id: str
+    work: Work,
+    candidates: tuple[EmployeeCandidate, ...],
+    employee_id: str,
+    policy_engine: PolicyEngine,
 ) -> EligibleEmployee:
-    return _select(work, candidates, employee_id, (), (), ())
+    return _select(work, candidates, employee_id, (), (), (), policy_engine)
 
 
 def _select_graph_employee(
-    work: Work, candidates: tuple[EmployeeCandidate, ...], node: GraphNodeInput
+    work: Work,
+    candidates: tuple[EmployeeCandidate, ...],
+    node: GraphNodeInput,
+    policy_engine: PolicyEngine,
 ) -> EligibleEmployee:
     scoped_candidates = tuple(
         EmployeeCandidate(
@@ -239,6 +274,7 @@ def _select_graph_employee(
         tuple(node.required_actions),
         tuple(node.resource_values),
         tuple(node.resource_kinds),
+        policy_engine,
     )
 
 
@@ -249,9 +285,10 @@ def _select(
     required_actions: tuple[str, ...],
     resources: tuple[str, ...],
     resource_kinds: tuple[str, ...],
+    policy_engine: PolicyEngine,
 ) -> EligibleEmployee:
     selected_id = EmployeeId(employee_id)
-    eligible = Selector().eligible(
+    eligible = Selector(policy_engine).eligible(
         employees=candidates,
         workspace_id=work.workspace_id,
         required_actions=required_actions,

@@ -85,6 +85,18 @@ importers:
         specifier: ^4.1.8
         version: 4.1.11(@types/node@22.20.1)(jsdom@29.1.1)(vite@8.2.1(@types/node@22.20.1))
 
+  packages/company-plugin-sdk:
+    devDependencies:
+      tsdown:
+        specifier: 0.21.0
+        version: 0.21.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.11(@types/node@22.20.1)(jsdom@29.1.1)(vite@8.2.1(@types/node@22.20.1))
+
 packages:
 
   '@adobe/css-tools@4.5.0':

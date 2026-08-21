@@ -24,6 +24,10 @@ function resolveCompanyPath(baseUrl: string, method: string, path: string): stri
     || /^\/employees\/[^/]+(?:\/revisions)?$/u.test(path)
     || /^\/works\/[^/]+(?:\/(?:events|cancel|delegations))?$/u.test(path)
     || /^\/approvals\/[^/]+\/(?:approve|reject)$/u.test(path)
+    || path === '/business-plugins'
+    || path === '/business-plugins/register'
+    || /^\/business-plugins\/[^/]+\/templates$/u.test(path)
+    || /^\/workspaces\/[^/]+\/templates\/[^/]+\/[^/]+\/instantiate$/u.test(path)
   if (!allowed) throw new Error('route_not_allowed')
 
   const base = new URL(baseUrl)

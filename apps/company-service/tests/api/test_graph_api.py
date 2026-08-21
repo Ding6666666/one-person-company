@@ -4,8 +4,10 @@ from typing import Any
 
 import pytest
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
+from dsh_company.business_plugins.registry import BusinessPluginRegistry
 from dsh_company.domain.approval import ApprovalStatus
 from dsh_company.domain.ids import AttemptId, WorkGraphRevisionId
+from dsh_company.domain.policy import PolicyEngine
 from dsh_company.dsh_gateway.contracts import (
     GatewayCancelResult,
     GatewayResult,
@@ -26,11 +28,15 @@ class RecordingGraphEngine:
         self._engine = engine
         self.started: list[WorkGraphRevisionId] = []
         self.persisted_at_start: list[bool] = []
+        self.fail_next_start = False
 
     def start(self, graph_revision_id: WorkGraphRevisionId) -> None:
         self.started.append(graph_revision_id)
         with SqlAlchemyUnitOfWork(self._engine) as uow:
             self.persisted_at_start.append(uow.works.get_revision(graph_revision_id) is not None)
+        if self.fail_next_start:
+            self.fail_next_start = False
+            raise RuntimeError("injected start failure")
 
 
 class RecordingGateway:
@@ -108,6 +114,22 @@ def _common(command_id: str) -> dict[str, Any]:
     }
 
 
+def _plugin_manifest() -> dict[str, Any]:
+    return {
+        "plugin_id": "content-studio",
+        "version": "0.1.0",
+        "display_name": "Content Studio",
+        "capability_actions": [
+            {
+                "action": "content-studio.publish_draft",
+                "level": 3,
+                "runtime_profiles": ["workspace_write"],
+            }
+        ],
+        "templates": [],
+    }
+
+
 def test_battle_creation_persists_parallel_graph_and_starts_after_commit(
     client: TestClient, graph_engine: RecordingGraphEngine
 ) -> None:
@@ -158,7 +180,31 @@ def test_same_workspace_command_is_idempotent_for_graph_creation(
 
     assert first.status_code == second.status_code == 202
     assert second.json()["id"] == first.json()["id"]
-    assert graph_engine.started == [WorkGraphRevisionId(first.json()["graph_revision_id"])]
+    graph_id = WorkGraphRevisionId(first.json()["graph_revision_id"])
+    assert graph_engine.started == [graph_id, graph_id]
+
+
+def test_same_command_retries_start_after_the_graph_was_persisted(
+    client: TestClient, graph_engine: RecordingGraphEngine
+) -> None:
+    workspace, employees = _seed(client)
+    payload = {
+        **_common("retry-start"),
+        "kind": "direct",
+        "employee_id": employees[0]["id"],
+    }
+    graph_engine.fail_next_start = True
+
+    first = client.post(f"/workspaces/{workspace['id']}/works", json=payload)
+    second = client.post(f"/workspaces/{workspace['id']}/works", json=payload)
+
+    assert first.status_code == 500
+    assert second.status_code == 202
+    works = client.get(f"/workspaces/{workspace['id']}/works").json()
+    assert len(works) == 1
+    graph_id = WorkGraphRevisionId(second.json()["graph_revision_id"])
+    assert graph_engine.started == [graph_id, graph_id]
+    assert graph_engine.persisted_at_start == [True, True]
 
 
 def test_discriminated_direct_uses_the_graph_creation_path(
@@ -450,3 +496,75 @@ def test_approval_required_graph_is_accepted_and_waits_without_gateway_dispatch(
         assert [
             (item.action, item.resource_values, item.requires_approval) for item in node_grants
         ] == [("workspace.read", (workspace_id,), True)]
+
+
+def test_registered_plugin_action_graph_uses_existing_approval_path(
+    engine: Engine,
+) -> None:
+    factory = lambda: SqlAlchemyUnitOfWork(engine)  # noqa: E731
+    registry = BusinessPluginRegistry(factory)
+    gateway = RecordingGateway()
+    coordinator = RuntimeCoordinator(factory, gateway, runtime_concurrency=1)
+    policy = PolicyEngine(registry.action_catalog)
+    graph_engine = DurableGraphEngine(
+        factory, coordinator, policy_engine=policy, runtime_concurrency=1
+    )
+    assembly = ComponentAssembly(
+        uow_factory=factory,
+        work_coordinator=coordinator,
+        orchestration_engine=graph_engine,
+        dispose=coordinator.shutdown,
+    )
+    with TestClient(create_app(assembly=assembly), raise_server_exceptions=False) as api:
+        assert api.post("/business-plugins/register", json=_plugin_manifest()).status_code == 201
+        workspace = api.post("/workspaces", json={"name": "Plugin Graph"}).json()
+        grant = {
+            "action": "content-studio.publish_draft",
+            "level": 3,
+            "resource_kind": "content",
+            "resource_values": ["draft"],
+            "requires_approval": False,
+        }
+        employee = api.post(
+            f"/workspaces/{workspace['id']}/employees",
+            json={
+                "display_name": "Publisher",
+                "responsibility": "Publish approved drafts",
+                "runtime_profile": "workspace_write",
+                "model": "deepseek-chat",
+                "grants": [grant],
+            },
+        ).json()
+        assert (
+            api.put(
+                f"/workspaces/{workspace['id']}/capabilities",
+                json={"grants": [grant]},
+            ).status_code
+            == 200
+        )
+
+        response = api.post(
+            f"/workspaces/{workspace['id']}/works",
+            json={
+                **_common("plugin-graph"),
+                "kind": "graph",
+                "nodes": [
+                    {
+                        "key": "publish",
+                        "employee_id": employee["id"],
+                        "objective": "Publish the draft",
+                        "acceptance_criteria": ["Published"],
+                        "required_actions": ["content-studio.publish_draft"],
+                        "resource_kinds": ["content"],
+                        "resource_values": ["draft"],
+                    }
+                ],
+                "edges": [],
+            },
+        )
+
+        assert response.status_code == 202
+        assert response.json()["nodes"][0]["status"] == "waiting_approval"
+        approvals = api.get(f"/workspaces/{workspace['id']}/approvals").json()
+        assert approvals[0]["action"] == "content-studio.publish_draft"
+        assert gateway.submissions == []

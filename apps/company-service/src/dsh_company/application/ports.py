@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import Protocol, Self
 
+from dsh_company.business_plugins.manifest import BusinessPluginRegistration
 from dsh_company.domain.approval import Approval
 from dsh_company.domain.capabilities import CapabilityGrant
 from dsh_company.domain.delegation import Delegation
@@ -187,6 +188,14 @@ class DelegationRepository(Protocol):
     def list_accepted(self) -> tuple[Delegation, ...]: ...
 
 
+class BusinessPluginRepository(Protocol):
+    def add(self, registration: BusinessPluginRegistration) -> None: ...
+
+    def get(self, plugin_id: str) -> BusinessPluginRegistration | None: ...
+
+    def list(self) -> tuple[BusinessPluginRegistration, ...]: ...
+
+
 class WorkDispatchQueue(Protocol):
     def enqueue(self, node_id: WorkNodeId) -> None: ...
 
@@ -241,6 +250,9 @@ class GovernanceUnitOfWork(WorkUnitOfWork, Protocol):
 
     @property
     def delegations(self) -> DelegationRepository: ...
+
+    @property
+    def business_plugins(self) -> BusinessPluginRepository: ...
 
 
 class UnitOfWorkFactory(Protocol):
