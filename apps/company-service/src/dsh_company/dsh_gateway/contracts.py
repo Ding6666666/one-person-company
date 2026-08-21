@@ -1,0 +1,50 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Protocol
+
+from dsh_company.domain.ids import AttemptId, EmployeeId, EmployeeRevisionId
+
+from .events import ProjectedDshEvent
+
+
+@dataclass(frozen=True, slots=True)
+class EmployeeRuntimeSnapshot:
+    employee_id: EmployeeId
+    employee_revision_id: EmployeeRevisionId
+    responsibility: str
+    runtime_profile: str
+    model: str
+    dsh_session_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class GatewaySubmission:
+    attempt_id: AttemptId
+    command_id: str
+    employee: EmployeeRuntimeSnapshot
+    objective: str
+    acceptance_criteria: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class GatewayResult:
+    finish_reason: str | None
+    reference_uri: str
+    event_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class GatewayCancelResult:
+    requested: bool
+    runtime_closed: bool
+
+
+class DshGateway(Protocol):
+    def submit(
+        self,
+        submission: GatewaySubmission,
+        *,
+        on_event: Callable[[ProjectedDshEvent], None],
+    ) -> GatewayResult: ...
+
+    def cancel(self, attempt_id: AttemptId) -> GatewayCancelResult: ...
