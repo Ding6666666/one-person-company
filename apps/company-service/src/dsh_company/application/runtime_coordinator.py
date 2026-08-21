@@ -96,7 +96,7 @@ class RuntimeCoordinator:
 
         with node_lock:
             source_sequence = max(result.event_count, highest_event_sequence) + 1
-            if result.finish_reason == "completed":
+            if result.finish_reason == "completed" and result.reference_uri is not None:
                 self._complete_if_running(
                     node_id,
                     submission.attempt_id,
@@ -239,6 +239,8 @@ class RuntimeCoordinator:
             if link.status is not ExecutionStatus.DISPATCH_PENDING:
                 return None
             node = self._single_node(aggregate)
+            if node.status is not WorkNodeStatus.READY:
+                return None
             employee = uow.employees.get_revision(
                 node.assigned_employee_id, node.employee_revision_id
             )

@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import Protocol, Self
 
+from dsh_company.domain.approval import Approval
 from dsh_company.domain.capabilities import CapabilityGrant
 from dsh_company.domain.employee import Employee, EmployeeAgentBinding, EmployeeRevision
 from dsh_company.domain.ids import (
+    ApprovalId,
     AttemptId,
     EmployeeId,
     EmployeeRevisionId,
@@ -122,6 +124,24 @@ class CompanyEventRepository(Protocol):
     def list_for_work(self, work_id: WorkId) -> tuple[CompanyEvent, ...]: ...
 
 
+class WorkspaceGrantRepository(Protocol):
+    def list_for_workspace(
+        self, workspace_id: WorkspaceId
+    ) -> tuple[CapabilityGrant, ...]: ...
+
+
+class NodeGrantRepository(Protocol):
+    def list_for_node(self, node_id: WorkNodeId) -> tuple[CapabilityGrant, ...]: ...
+
+
+class ApprovalRepository(Protocol):
+    def add(self, approval: Approval) -> None: ...
+
+    def get(self, approval_id: ApprovalId) -> Approval | None: ...
+
+    def decide(self, approval: Approval) -> None: ...
+
+
 class WorkDispatchQueue(Protocol):
     def enqueue(self, node_id: WorkNodeId) -> None: ...
 
@@ -158,6 +178,17 @@ class WorkUnitOfWork(UnitOfWork, Protocol):
 
     @property
     def company_events(self) -> CompanyEventRepository: ...
+
+
+class GovernanceUnitOfWork(WorkUnitOfWork, Protocol):
+    @property
+    def workspace_grants(self) -> WorkspaceGrantRepository: ...
+
+    @property
+    def node_grants(self) -> NodeGrantRepository: ...
+
+    @property
+    def approvals(self) -> ApprovalRepository: ...
 
 
 class UnitOfWorkFactory(Protocol):

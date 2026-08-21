@@ -373,6 +373,31 @@ def test_pending_cancel_blocks_without_gateway_and_prevents_later_dispatch(
     assert gateway.submissions == []
 
 
+def test_waiting_approval_is_never_dispatched_even_with_a_pending_link(
+    sqlite_engine: Engine,
+) -> None:
+    aggregate = _seed(sqlite_engine)
+    factory = _uow_factory(sqlite_engine)
+    with factory() as uow:
+        stored = uow.works.get(aggregate.work.id)
+        assert stored is not None
+        uow.works.update(
+            replace(stored, nodes=(stored.nodes[0].wait_for_approval(),))
+        )
+        uow.commit()
+    gateway = RecordingGateway(factory)
+    coordinator = RuntimeCoordinator(factory, gateway)
+
+    coordinator.dispatch(aggregate.nodes[0].id)
+
+    assert gateway.submissions == []
+    with factory() as uow:
+        waiting = uow.works.get(aggregate.work.id)
+    assert waiting is not None
+    assert waiting.nodes[0].status is WorkNodeStatus.WAITING_APPROVAL
+    assert waiting.execution_links[0].status is ExecutionStatus.DISPATCH_PENDING
+
+
 def test_cancel_is_idempotent_for_blocked_and_completed_work(
     sqlite_engine: Engine,
 ) -> None:

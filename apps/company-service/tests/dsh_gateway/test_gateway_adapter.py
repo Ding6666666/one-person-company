@@ -10,6 +10,7 @@ from deepseek_harness import Notification
 from dsh_company.domain.ids import AttemptId, EmployeeId, EmployeeRevisionId
 from dsh_company.dsh_gateway.adapter import PublicSdkDshGateway
 from dsh_company.dsh_gateway.contracts import EmployeeRuntimeSnapshot, GatewaySubmission
+from dsh_company.dsh_gateway.control_requests import ApprovalControlRequest
 from dsh_company.dsh_gateway.supervisor import RuntimeSupervisor
 
 
@@ -46,7 +47,7 @@ class FakeSession:
         for notification in self._notifications:
             if on_notification is not None:
                 on_notification(notification)
-        return FakeRunResult()
+        return FakeRunResult(final_response=self._harness.factory.final_response)
 
 
 class FakeHarness:
@@ -78,10 +79,12 @@ class FakeHarnessFactory:
         notifications: tuple[Notification, ...] = (),
         run_started: Event | None = None,
         release_run: Event | None = None,
+        final_response: str = "must never escape the adapter",
     ) -> None:
         self.notifications = notifications
         self.run_started = run_started
         self.release_run = release_run
+        self.final_response = final_response
         self.last_session_id: str | None = None
         self.last_harness: FakeHarness | None = None
         self.create_calls = 0
@@ -177,6 +180,74 @@ def test_gateway_uses_deterministic_prompt_and_callback_sequence(tmp_path: Path)
     assert [event.source_sequence for event in projected] == [1, 2]
     assert result.event_count == 2
     assert "must never escape" not in repr(result)
+
+
+def test_gateway_returns_typed_control_request_without_result_reference(
+    tmp_path: Path,
+) -> None:
+    factory = FakeHarnessFactory(
+        final_response=(
+            '{"kind":"approval","action":"workspace.write",'
+            '"resources":["repo-a"],"reason":"publish release"}'
+        )
+    )
+    gateway = make_gateway(factory, tmp_path)
+
+    result = gateway.submit(submission(), on_event=lambda event: None)
+
+    assert isinstance(result.control_request, ApprovalControlRequest)
+    assert result.reference_uri is None
+    assert not hasattr(result, "raw_model_output")
+
+
+def test_gateway_keeps_normal_output_as_an_opaque_reference(tmp_path: Path) -> None:
+    factory = FakeHarnessFactory(final_response="A concise normal result")
+    gateway = make_gateway(factory, tmp_path)
+
+    result = gateway.submit(submission(), on_event=lambda event: None)
+
+    assert result.control_request is None
+    assert result.reference_uri == (
+        "dsh-session://employee-emp-1/attempt/attempt-1/result"
+    )
+    assert "concise normal result" not in repr(result).lower()
+
+
+def test_gateway_keeps_prose_that_mentions_kind_and_approval_as_normal_output(
+    tmp_path: Path,
+) -> None:
+    factory = FakeHarnessFactory(
+        final_response='The field "kind" needs "approval" from a reviewer.'
+    )
+    gateway = make_gateway(factory, tmp_path)
+
+    result = gateway.submit(submission(), on_event=lambda event: None)
+
+    assert result.control_request is None
+    assert result.reference_uri == (
+        "dsh-session://employee-emp-1/attempt/attempt-1/result"
+    )
+
+
+@pytest.mark.parametrize(
+    "final_response",
+    [
+        '{"kind":"approval"}',
+        'prefix {"kind":"delegation"}',
+        '{"kind":"approval","action":"unknown.action",'
+        '"resources":["repo-a"],"reason":"x"}',
+    ],
+)
+def test_gateway_rejects_malformed_control_attempts(
+    tmp_path: Path, final_response: str
+) -> None:
+    factory = FakeHarnessFactory(final_response=final_response)
+    gateway = make_gateway(factory, tmp_path)
+
+    with pytest.raises(ValueError, match="control"):
+        gateway.submit(submission(), on_event=lambda event: None)
+
+    assert factory.close_calls == ["attempt-1"]
 
 
 def test_gateway_selects_checked_in_profile_and_company_environment(tmp_path: Path) -> None:

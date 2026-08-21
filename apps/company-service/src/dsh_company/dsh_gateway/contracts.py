@@ -4,6 +4,7 @@ from typing import Protocol
 
 from dsh_company.domain.ids import AttemptId, EmployeeId, EmployeeRevisionId
 
+from .control_requests import ControlRequest
 from .events import ProjectedDshEvent
 
 
@@ -29,8 +30,9 @@ class GatewaySubmission:
 @dataclass(frozen=True, slots=True)
 class GatewayResult:
     finish_reason: str | None
-    reference_uri: str
+    reference_uri: str | None
     event_count: int
+    control_request: ControlRequest | None = None
 
 
 @dataclass(frozen=True, slots=True)

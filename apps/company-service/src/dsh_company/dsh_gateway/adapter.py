@@ -11,6 +11,7 @@ from .contracts import (
     GatewayResult,
     GatewaySubmission,
 )
+from .control_requests import is_control_request_candidate, parse_control_request
 from .events import ProjectedDshEvent, project_notification
 from .supervisor import ClosableHarness, RuntimeSupervisor
 
@@ -22,6 +23,7 @@ _DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 10.0
 
 class _RunResult(Protocol):
     finish_reason: str | None
+    final_response: str
 
 
 class _Session(Protocol):
@@ -118,13 +120,24 @@ class PublicSdkDshGateway:
         try:
             session = harness.start_session(submission.employee.dsh_session_id)
             result = session.run(_prompt(submission), on_notification=receive)
+            try:
+                control_request = parse_control_request(result.final_response)
+            except ValueError:
+                if is_control_request_candidate(result.final_response):
+                    raise
+                control_request = None
             return GatewayResult(
                 finish_reason=result.finish_reason,
                 reference_uri=(
-                    f"dsh-session://{submission.employee.dsh_session_id}/attempt/"
-                    f"{submission.attempt_id}/result"
+                    None
+                    if control_request is not None
+                    else (
+                        f"dsh-session://{submission.employee.dsh_session_id}/attempt/"
+                        f"{submission.attempt_id}/result"
+                    )
                 ),
                 event_count=event_count,
+                control_request=control_request,
             )
         finally:
             self._supervisor.finish(submission.attempt_id, harness)
