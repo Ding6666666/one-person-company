@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -9,6 +9,7 @@ from dsh_company.application.ports import WorkAggregate
 from dsh_company.domain.approval import Approval, ApprovalStatus
 from dsh_company.domain.capabilities import CapabilityGrant, CapabilityLevel
 from dsh_company.domain.delegation import (
+    Delegation,
     DelegationProposal,
     DelegationRevision,
     apply_delegation,
@@ -16,6 +17,7 @@ from dsh_company.domain.delegation import (
 from dsh_company.domain.employee import Employee
 from dsh_company.domain.ids import (
     ApprovalId,
+    ArtifactReferenceId,
     CapabilityGrantId,
     DelegationId,
     EmployeeId,
@@ -120,6 +122,9 @@ def test_pending_approval_delegation_and_graph_revision_survive_restart(
     with SqlAlchemyUnitOfWork(restarted_engine) as uow:
         approval = uow.approvals.get(ApprovalId("approval-1"))
         delegation = uow.delegations.get(DelegationId("delegation-1"))
+        delegation_by_target = uow.delegations.get_accepted_for_target(
+            WorkNodeId("node-2")
+        )
         graph_1 = uow.works.get_revision(WorkGraphRevisionId("graph-1"))
         graph_2 = uow.works.get_revision(WorkGraphRevisionId("graph-2"))
     restarted_engine.dispose()
@@ -127,6 +132,7 @@ def test_pending_approval_delegation_and_graph_revision_survive_restart(
     assert approval is not None and approval.status is ApprovalStatus.PENDING
     assert approval.requested_at.tzinfo is UTC
     assert delegation is not None and delegation.status == "accepted"
+    assert delegation_by_target == delegation
     assert delegation.created_at.tzinfo is UTC
     assert graph_1 is not None
     assert graph_2 is not None
@@ -174,6 +180,58 @@ def test_workspace_and_node_capability_grants_round_trip(tmp_path: Path) -> None
     ]
     assert [replace(item, id=node_grant.id) for item in stored_node_grants] == [node_grant]
     assert isinstance(stored_workspace_grants[0].resource_values, tuple)
+
+
+def test_rejected_delegation_and_parent_input_ids_survive_restart(
+    tmp_path: Path,
+) -> None:
+    engine = create_sqlite_engine(tmp_path / "company.db")
+    create_tables(engine)
+    with SqlAlchemyUnitOfWork(engine) as uow:
+        _, revised = _seed_governed_work(uow)
+        parent = revised.nodes[0]
+        input_id = ArtifactReferenceId("artifact-child")
+        aggregate = uow.works.get(WorkId("work-1"))
+        assert aggregate is not None
+        uow.works.update(
+            replace(
+                aggregate,
+                nodes=(
+                    replace(
+                        parent,
+                        version=parent.version + 1,
+                        input_references=(input_id,),
+                    ),
+                    revised.nodes[1],
+                ),
+            )
+        )
+        uow.delegations.add(
+            Delegation(
+                id=DelegationId("delegation-rejected"),
+                workspace_id=WorkspaceId("ws-1"),
+                work_id=WorkId("work-1"),
+                source_node_id=parent.id,
+                target_node_id=None,
+                proposer_employee_id=EmployeeId("emp-a"),
+                target_employee_id=EmployeeId("emp-b"),
+                graph_revision_id=WorkGraphRevisionId("graph-1"),
+                status="rejected",
+                created_at=datetime.now(UTC),
+            )
+        )
+        uow.commit()
+
+    with SqlAlchemyUnitOfWork(engine) as uow:
+        stored = uow.works.get(WorkId("work-1"))
+        rejected = uow.delegations.get(DelegationId("delegation-rejected"))
+    engine.dispose()
+
+    assert stored is not None
+    assert stored.nodes[0].input_references == (input_id,)
+    assert rejected is not None
+    assert rejected.status == "rejected"
+    assert rejected.target_node_id is None
 
 
 def test_approval_decision_is_optimistic_and_reason_is_bounded(tmp_path: Path) -> None:

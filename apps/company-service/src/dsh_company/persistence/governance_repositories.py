@@ -200,10 +200,29 @@ class DelegationRepository:
             workspace_id=WorkspaceId(row.workspace_id),
             work_id=WorkId(row.work_id),
             source_node_id=WorkNodeId(row.source_node_id),
-            target_node_id=WorkNodeId(row.target_node_id),
+            target_node_id=(
+                None
+                if row.target_node_id is None
+                else WorkNodeId(row.target_node_id)
+            ),
             proposer_employee_id=EmployeeId(row.proposer_employee_id),
             target_employee_id=EmployeeId(row.target_employee_id),
             graph_revision_id=WorkGraphRevisionId(row.graph_revision_id),
             status=cast(DelegationStatus, row.status),
             created_at=row.created_at.replace(tzinfo=UTC),
         )
+
+    def update(self, delegation: Delegation) -> None:
+        row = self._session.get(DelegationRow, delegation.id)
+        if row is None:
+            raise LookupError(f"delegation not found: {delegation.id}")
+        row.status = delegation.status
+
+    def get_accepted_for_target(self, node_id: WorkNodeId) -> Delegation | None:
+        row = self._session.scalar(
+            select(DelegationRow).where(
+                DelegationRow.target_node_id == node_id,
+                DelegationRow.status == "accepted",
+            )
+        )
+        return None if row is None else self.get(DelegationId(row.id))

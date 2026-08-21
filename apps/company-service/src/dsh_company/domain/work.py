@@ -127,6 +127,7 @@ class WorkNode:
     active_attempt_id: AttemptId | None
     failure_code: str | None
     version: int
+    input_references: tuple[ArtifactReferenceId, ...] = ()
 
     def wait_for_approval(self) -> "WorkNode":
         _expect_status(self.status, WorkNodeStatus.READY)

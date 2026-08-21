@@ -87,6 +87,7 @@ class WorkRepository:
                 work_id=node.work_id,
                 objective=node.objective,
                 acceptance_criteria_json=json.dumps(node.acceptance_criteria, ensure_ascii=False),
+                input_references_json=json.dumps(node.input_references, ensure_ascii=False),
                 assigned_employee_id=node.assigned_employee_id,
                 employee_revision_id=node.employee_revision_id,
                 status=node.status.value,
@@ -300,6 +301,9 @@ class WorkRepository:
                         acceptance_criteria_json=json.dumps(
                             node.acceptance_criteria, ensure_ascii=False
                         ),
+                        input_references_json=json.dumps(
+                            node.input_references, ensure_ascii=False
+                        ),
                         assigned_employee_id=node.assigned_employee_id,
                         employee_revision_id=node.employee_revision_id,
                         status=node.status.value,
@@ -403,6 +407,10 @@ class WorkRepository:
             work_id=WorkId(row.work_id),
             objective=row.objective,
             acceptance_criteria=tuple(json.loads(row.acceptance_criteria_json)),
+            input_references=tuple(
+                ArtifactReferenceId(value)
+                for value in json.loads(row.input_references_json)
+            ),
             assigned_employee_id=EmployeeId(row.assigned_employee_id),
             employee_revision_id=EmployeeRevisionId(row.employee_revision_id),
             status=WorkNodeStatus(row.status),
@@ -421,6 +429,7 @@ class WorkRepository:
             work_id=node.work_id,
             objective=node.objective,
             acceptance_criteria_json=json.dumps(node.acceptance_criteria, ensure_ascii=False),
+            input_references_json=json.dumps(node.input_references, ensure_ascii=False),
             assigned_employee_id=node.assigned_employee_id,
             employee_revision_id=node.employee_revision_id,
             status=node.status.value,

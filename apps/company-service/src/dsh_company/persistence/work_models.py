@@ -71,6 +71,7 @@ class WorkNodeRow(Base):
     work_id: Mapped[str] = mapped_column(ForeignKey("works.id"), nullable=False)
     objective: Mapped[str] = mapped_column(Text, nullable=False)
     acceptance_criteria_json: Mapped[str] = mapped_column(Text, nullable=False)
+    input_references_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     assigned_employee_id: Mapped[str] = mapped_column(ForeignKey("employees.id"), nullable=False)
     employee_revision_id: Mapped[str] = mapped_column(
         ForeignKey("employee_revisions.id"), nullable=False

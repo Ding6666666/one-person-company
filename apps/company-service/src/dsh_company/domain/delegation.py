@@ -33,12 +33,18 @@ class Delegation:
     workspace_id: WorkspaceId
     work_id: WorkId
     source_node_id: WorkNodeId
-    target_node_id: WorkNodeId
+    target_node_id: WorkNodeId | None
     proposer_employee_id: EmployeeId
     target_employee_id: EmployeeId
     graph_revision_id: WorkGraphRevisionId
     status: DelegationStatus
     created_at: datetime
+
+    def __post_init__(self) -> None:
+        if self.status in {"accepted", "completed"} and self.target_node_id is None:
+            raise ValueError("accepted delegation requires a target node")
+        if self.status == "rejected" and self.target_node_id is not None:
+            raise ValueError("rejected delegation cannot have a target node")
 
 
 @dataclass(frozen=True, slots=True)

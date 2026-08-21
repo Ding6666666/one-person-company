@@ -4,10 +4,12 @@ from typing import Protocol, Self
 
 from dsh_company.domain.approval import Approval
 from dsh_company.domain.capabilities import CapabilityGrant
+from dsh_company.domain.delegation import Delegation
 from dsh_company.domain.employee import Employee, EmployeeAgentBinding, EmployeeRevision
 from dsh_company.domain.ids import (
     ApprovalId,
     AttemptId,
+    DelegationId,
     EmployeeId,
     EmployeeRevisionId,
     WorkId,
@@ -107,6 +109,10 @@ class WorkRepository(Protocol):
 
     def get_for_attempt(self, attempt_id: AttemptId) -> WorkAggregate | None: ...
 
+    def add_revision(
+        self, graph: WorkGraphRevision, nodes: tuple[WorkNode, ...]
+    ) -> None: ...
+
     def list_for_workspace(
         self, workspace_id: WorkspaceId
     ) -> tuple[WorkAggregate, ...]: ...
@@ -133,6 +139,10 @@ class WorkspaceGrantRepository(Protocol):
 class NodeGrantRepository(Protocol):
     def list_for_node(self, node_id: WorkNodeId) -> tuple[CapabilityGrant, ...]: ...
 
+    def replace(
+        self, node_id: WorkNodeId, grants: tuple[CapabilityGrant, ...]
+    ) -> None: ...
+
 
 class ApprovalRepository(Protocol):
     def add(self, approval: Approval) -> None: ...
@@ -140,6 +150,16 @@ class ApprovalRepository(Protocol):
     def get(self, approval_id: ApprovalId) -> Approval | None: ...
 
     def decide(self, approval: Approval) -> None: ...
+
+
+class DelegationRepository(Protocol):
+    def add(self, delegation: Delegation) -> None: ...
+
+    def get(self, delegation_id: DelegationId) -> Delegation | None: ...
+
+    def update(self, delegation: Delegation) -> None: ...
+
+    def get_accepted_for_target(self, node_id: WorkNodeId) -> Delegation | None: ...
 
 
 class WorkDispatchQueue(Protocol):
@@ -190,6 +210,13 @@ class GovernanceUnitOfWork(WorkUnitOfWork, Protocol):
     @property
     def approvals(self) -> ApprovalRepository: ...
 
+    @property
+    def delegations(self) -> DelegationRepository: ...
+
 
 class UnitOfWorkFactory(Protocol):
     def __call__(self) -> WorkUnitOfWork: ...
+
+
+class GovernanceUnitOfWorkFactory(Protocol):
+    def __call__(self) -> GovernanceUnitOfWork: ...

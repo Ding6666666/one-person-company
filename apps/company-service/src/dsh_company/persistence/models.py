@@ -135,9 +135,11 @@ class DelegationRow(Base):
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), nullable=False)
     work_id: Mapped[str] = mapped_column(ForeignKey("works.id"), nullable=False)
     source_node_id: Mapped[str] = mapped_column(ForeignKey("work_nodes.id"), nullable=False)
-    target_node_id: Mapped[str] = mapped_column(ForeignKey("work_nodes.id"), nullable=False)
+    target_node_id: Mapped[str | None] = mapped_column(
+        ForeignKey("work_nodes.id"), nullable=True
+    )
     proposer_employee_id: Mapped[str] = mapped_column(ForeignKey("employees.id"), nullable=False)
-    target_employee_id: Mapped[str] = mapped_column(ForeignKey("employees.id"), nullable=False)
+    target_employee_id: Mapped[str] = mapped_column(String, nullable=False)
     graph_revision_id: Mapped[str] = mapped_column(
         ForeignKey("work_graph_revisions.id"), nullable=False
     )

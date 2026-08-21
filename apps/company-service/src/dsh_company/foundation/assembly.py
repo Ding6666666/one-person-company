@@ -7,7 +7,9 @@ from dsh_company.api.company import router as company_router
 from dsh_company.api.work import router as work_router
 from dsh_company.application.ports import WorkCoordinator, WorkUnitOfWork
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
+from dsh_company.application.runtime_governance import RuntimeGovernanceHandler
 from dsh_company.domain.ids import WorkNodeId
+from dsh_company.domain.policy import PolicyEngine
 from dsh_company.dsh_gateway.adapter import PublicSdkDshGateway
 from dsh_company.foundation.config import Settings
 from dsh_company.persistence.database import create_sqlite_engine, create_tables
@@ -74,9 +76,14 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
         def uow_factory() -> SqlAlchemyUnitOfWork:
             return SqlAlchemyUnitOfWork(engine)
 
+        governance_handler = RuntimeGovernanceHandler(
+            uow_factory,
+            PolicyEngine(),
+        )
         coordinator = RuntimeCoordinator(
             uow_factory,
             gateway,
+            governance_handler=governance_handler,
             runtime_concurrency=settings.runtime_concurrency,
         )
     except BaseException:

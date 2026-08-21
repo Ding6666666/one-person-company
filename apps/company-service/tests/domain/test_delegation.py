@@ -1,8 +1,9 @@
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime
 
 import pytest
 from dsh_company.domain.delegation import (
+    Delegation,
     DelegationProposal,
     apply_delegation,
 )
@@ -135,3 +136,24 @@ def test_graph_revision_rejects_cycles_and_unknown_edge_nodes() -> None:
                 WorkEdge(node_b, node_a, WorkEdgeKind.DELEGATES_TO),
             ),
         )
+
+
+def test_rejected_delegation_has_no_false_target_node() -> None:
+    rejected = Delegation(
+        id=DelegationId("delegation-rejected"),
+        workspace_id=WorkspaceId("ws-1"),
+        work_id=WorkId("work-1"),
+        source_node_id=WorkNodeId("node-parent"),
+        target_node_id=None,
+        proposer_employee_id=EmployeeId("emp-a"),
+        target_employee_id=EmployeeId("emp-b"),
+        graph_revision_id=WorkGraphRevisionId("graph-1"),
+        status="rejected",
+        created_at=datetime.now(UTC),
+    )
+
+    assert rejected.target_node_id is None
+    with pytest.raises(ValueError, match="accepted delegation requires a target node"):
+        replace(rejected, status="accepted")
+    with pytest.raises(ValueError, match="rejected delegation cannot have a target node"):
+        replace(rejected, target_node_id=WorkNodeId("node-placeholder"))
