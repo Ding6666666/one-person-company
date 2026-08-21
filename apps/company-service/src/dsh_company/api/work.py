@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request, status
 
 from dsh_company.application.ports import DuplicateCommand, WorkAggregate
 from dsh_company.application.work_commands import CreateDirectWork
-from dsh_company.application.work_service import WorkService
+from dsh_company.application.work_service import WorkCancellationNotSupported, WorkService
 from dsh_company.business_plugins.registry import BusinessPluginRegistry
 from dsh_company.domain.capabilities import CapabilityGrant
 from dsh_company.domain.ids import (
@@ -386,7 +386,7 @@ def list_work_events(work_id: str, service: WorkServiceDependency) -> list[Compa
     "/works/{work_id}/cancel",
     response_model=WorkProjection,
     status_code=status.HTTP_202_ACCEPTED,
-    responses=not_found_response,
+    responses={**not_found_response, **{409: {"model": ErrorEnvelope}}},
 )
 def cancel_work(
     request: Request,
@@ -399,4 +399,6 @@ def cancel_work(
         )
     except LookupError as error:
         raise ResourceNotFoundError("work") from error
+    except WorkCancellationNotSupported as error:
+        raise ConflictError("work_cancel_not_supported", str(error)) from error
     return WorkProjection.from_aggregate(aggregate)

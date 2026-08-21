@@ -24,7 +24,7 @@ from dsh_company.domain.ids import (
     WorkNodeId,
     WorkspaceId,
 )
-from dsh_company.domain.policy import PolicyEngine
+from dsh_company.domain.policy import DecisionKind, PolicyEngine
 from dsh_company.domain.work import (
     ExecutionLink,
     ExecutionStatus,
@@ -166,7 +166,9 @@ def _seed(
     links: tuple[ExecutionLink, ...] = (),
     work_status: WorkStatus = WorkStatus.QUEUED,
     approval_action: str | None = None,
+    approval_actions: tuple[str, ...] = (),
 ) -> None:
+    governed_actions = approval_actions or (() if approval_action is None else (approval_action,))
     with SqlAlchemyUnitOfWork(engine) as uow:
         workspace = Workspace.create(WorkspaceId("ws-1"), "Graph tests")
         uow.workspaces.add(workspace)
@@ -180,20 +182,17 @@ def _seed(
                 runtime_profile="workspace_read",
                 model="model",
             )
-            employee_grants = (
-                ()
-                if approval_action is None
-                else (
+            employee_grants = tuple(
                     CapabilityGrant(
-                        id=CapabilityGrantId(f"employee-grant-{node.id}"),
+                        id=CapabilityGrantId(f"employee-grant-{node.id}-{action}"),
                         employee_revision_id=revision.id,
-                        action=approval_action,
+                        action=action,
                         level=CapabilityLevel.L1,
                         resource_kind="workspace",
                         resource_values=("ws-1",),
                         requires_approval=True,
-                    ),
-                )
+                    )
+                    for action in governed_actions
             )
             uow.employees.add(employee, revision, binding, employee_grants)
             stored_nodes.append(replace(node, employee_revision_id=revision.id))
@@ -216,34 +215,36 @@ def _seed(
             created_at=datetime.now(UTC),
         )
         uow.works.add(WorkAggregate(work, graph, tuple(stored_nodes), links, ()))
-        if approval_action is not None:
+        if governed_actions:
             uow.workspace_grants.replace(
                 workspace.id,
-                (
+                tuple(
                     CapabilityGrant(
-                        id=CapabilityGrantId("workspace-grant"),
+                        id=CapabilityGrantId(f"workspace-grant-{action}"),
                         employee_revision_id=None,
-                        action=approval_action,
+                        action=action,
                         level=CapabilityLevel.L1,
                         resource_kind="workspace",
                         resource_values=("ws-1",),
                         requires_approval=False,
-                    ),
+                    )
+                    for action in governed_actions
                 ),
             )
             for node in stored_nodes:
                 uow.node_grants.replace(
                     node.id,
-                    (
+                    tuple(
                         CapabilityGrant(
-                            id=CapabilityGrantId(f"node-grant-{node.id}"),
+                            id=CapabilityGrantId(f"node-grant-{node.id}-{action}"),
                             employee_revision_id=None,
-                            action=approval_action,
+                            action=action,
                             level=CapabilityLevel.L1,
                             resource_kind="workspace",
                             resource_values=("ws-1",),
                             requires_approval=False,
-                        ),
+                        )
+                        for action in governed_actions
                     ),
                 )
         uow.commit()
@@ -548,6 +549,29 @@ def test_policy_is_reevaluated_before_attempt_creation(sqlite_engine: Engine) ->
     assert coordinator.enqueued == []
 
 
+def test_policy_denial_in_any_required_action_precedes_approval(
+    sqlite_engine: Engine,
+) -> None:
+    node = _node(
+        "mixed-policy",
+        required_actions=("workspace.read", "workspace.write"),
+    )
+    _seed(sqlite_engine, (node,), approval_action="workspace.read")
+    coordinator = RecordingCoordinator()
+
+    _engine(sqlite_engine, coordinator).reconcile(WorkId("work-1"))
+
+    with _factory(sqlite_engine)() as uow:
+        stored = uow.works.get(WorkId("work-1"))
+        approvals = uow.approvals.list_for_workspace(WorkspaceId("ws-1"))
+    assert stored is not None
+    assert stored.nodes[0].status is WorkNodeStatus.BLOCKED
+    assert stored.nodes[0].failure_code == "workspace_not_granted"
+    assert stored.execution_links == ()
+    assert approvals == ()
+    assert coordinator.enqueued == []
+
+
 def test_policy_approval_waits_with_a_durable_attempt_then_resumes(
     sqlite_engine: Engine,
 ) -> None:
@@ -577,6 +601,61 @@ def test_policy_approval_waits_with_a_durable_attempt_then_resumes(
     service.resume_approved(approved.id)
 
     assert coordinator.enqueued == [node.id]
+
+
+def test_every_approval_required_action_is_decided_before_dispatch(
+    sqlite_engine: Engine,
+) -> None:
+    actions = ("conversation.respond", "workspace.read")
+    node = _node("multi-approval", required_actions=actions)
+    _seed(sqlite_engine, (node,), approval_actions=actions)
+    coordinator = RecordingCoordinator()
+    engine = DurableGraphEngine(_factory(sqlite_engine), coordinator)
+
+    engine.reconcile(WorkId("work-1"))
+
+    with _factory(sqlite_engine)() as uow:
+        approvals = uow.approvals.list_for_workspace(WorkspaceId("ws-1"))
+    assert tuple(item.action for item in approvals) == actions
+    service = GovernanceService(_factory(sqlite_engine)(), PolicyEngine(), coordinator)
+    first = service.approve(approvals[0].id, decided_by="operator")
+    result = service.resume_approved(first.id)
+    assert result.kind is DecisionKind.REQUIRE_APPROVAL
+    assert coordinator.enqueued == []
+    with _factory(sqlite_engine)() as uow:
+        waiting = uow.works.get(WorkId("work-1"))
+    assert waiting is not None
+    assert waiting.nodes[0].status is WorkNodeStatus.WAITING_APPROVAL
+
+    second = service.approve(approvals[1].id, decided_by="operator")
+    result = service.resume_approved(second.id)
+
+    assert result.kind is DecisionKind.ALLOW
+    assert coordinator.enqueued == [node.id]
+
+
+def test_rejecting_one_required_action_cancels_the_other_pending_approvals(
+    sqlite_engine: Engine,
+) -> None:
+    actions = ("conversation.respond", "workspace.read")
+    node = _node("multi-reject", required_actions=actions)
+    _seed(sqlite_engine, (node,), approval_actions=actions)
+    coordinator = RecordingCoordinator()
+    engine = DurableGraphEngine(_factory(sqlite_engine), coordinator)
+    engine.reconcile(WorkId("work-1"))
+    with _factory(sqlite_engine)() as uow:
+        approvals = uow.approvals.list_for_workspace(WorkspaceId("ws-1"))
+
+    GovernanceService(
+        _factory(sqlite_engine)(),
+        PolicyEngine(),
+        coordinator,
+        terminal_observer=engine,
+    ).reject(approvals[0].id, decided_by="operator")
+
+    with _factory(sqlite_engine)() as uow:
+        decided = uow.approvals.list_for_workspace(WorkspaceId("ws-1"))
+    assert [item.status.value for item in decided] == ["rejected", "cancelled"]
 
 
 def test_approval_attempts_reserve_the_same_global_capacity_as_allowed_nodes(

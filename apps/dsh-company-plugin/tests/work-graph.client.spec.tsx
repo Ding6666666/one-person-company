@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CompanySurface } from '../src/client/CompanySurface.js'
 import { StrategyComposer, type StrategyDraft, validateStrategyDraft } from '../src/client/StrategyComposer.js'
+import { WorkDetail } from '../src/client/WorkDetail.js'
 import { WorkGraphView } from '../src/client/WorkGraphView.js'
 import type { Employee, StrategyWorkCreate, WorkProjection } from '../src/client/api.js'
 import { translate } from '../src/client/locales.js'
@@ -222,5 +223,27 @@ describe('multi-employee work graph experience', () => {
     expect(screen.getByRole('article', { name: /Summary/ })).toHaveTextContent('dependency_failed')
     expect(screen.getByRole('article', { name: /Summary/ })).toHaveTextContent('Attempts: 1 / 2')
     expect(screen.getByText('Proposal A summarizes Summary')).toBeVisible()
+  })
+
+  it('does not offer Direct-only cancellation for a running graph work', () => {
+    const work = {
+      id: 'work-graph-cancel', workspace_id: 'ws-1', command_id: 'cmd', objective: 'Graph work',
+      status: 'running', graph_revision_id: 'graph-1', graph_revision_number: 1, strategy: 'graph', created_at: now,
+      nodes: [{
+        id: 'node-1', objective: 'Node', acceptance_criteria: ['Done'], assigned_employee_id: 'emp-1',
+        employee_revision_id: 'rev-1', status: 'running', active_attempt_id: 'attempt-1', failure_code: null,
+        version: 2, attempt_count: 1, max_attempts: 1,
+      }],
+      edges: [],
+      execution_links: [{
+        id: 'link-1', node_id: 'node-1', attempt_id: 'attempt-1', status: 'running',
+        started_at: now, finished_at: null, diagnostic_code: null,
+      }],
+      artifacts: [],
+    } satisfies WorkProjection
+
+    render(<WorkDetail work={work} events={[]} pending={false} onCancel={() => undefined} t={t} />)
+
+    expect(screen.queryByRole('button', { name: 'Request cancellation' })).not.toBeInTheDocument()
   })
 })

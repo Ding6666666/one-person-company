@@ -702,6 +702,102 @@ def test_runtime_rejected_delegation_blocks_source_intentionally() -> None:
     assert coordinator.enqueued == []
 
 
+def test_rejected_delegation_preserves_a_running_sibling() -> None:
+    uow = FakeUow()
+    original = uow.works.aggregate
+    source = original.nodes[0]
+    source_link = original.execution_links[0]
+    sibling = replace(
+        source,
+        id=WorkNodeId("node-sibling"),
+        active_attempt_id=AttemptId("attempt-sibling"),
+        version=1,
+    )
+    sibling_link = replace(
+        source_link,
+        id=ExecutionLinkId("link-sibling"),
+        node_id=sibling.id,
+        attempt_id=AttemptId("attempt-sibling"),
+        command_id="command-sibling",
+    )
+    uow.works.aggregate = replace(
+        original,
+        graph=replace(original.graph, node_ids=(source.id, sibling.id)),
+        nodes=(source, sibling),
+        execution_links=(source_link, sibling_link),
+    )
+    command = _command(target="emp-missing")
+
+    with pytest.raises(DelegationDenied, match="target_not_found"):
+        _service(uow, RecordingDispatch()).propose(command)
+
+    stored = uow.works.aggregate
+    assert stored.work.status is WorkStatus.RUNNING
+    assert stored.nodes[0].status is WorkNodeStatus.BLOCKED
+    assert stored.nodes[0].failure_code == "delegation_rejected"
+    assert stored.nodes[1] == sibling
+    assert stored.execution_links[1] == sibling_link
+
+
+def test_unhandled_control_request_preserves_a_running_sibling() -> None:
+    uow = FakeUow()
+    original = uow.works.aggregate
+    running_source = original.nodes[0]
+    running_source_link = original.execution_links[0]
+    source = replace(
+        running_source,
+        status=WorkNodeStatus.READY,
+        active_attempt_id=None,
+        version=1,
+    )
+    source_link = ExecutionLink.dispatch(
+        execution_link_id=running_source_link.id,
+        attempt_id=running_source_link.attempt_id,
+        node_id=source.id,
+        command_id=running_source_link.command_id,
+        dsh_session_id=running_source_link.dsh_session_id,
+    )
+    sibling = replace(
+        running_source,
+        id=WorkNodeId("node-sibling"),
+        active_attempt_id=AttemptId("attempt-sibling"),
+        version=1,
+    )
+    sibling_link = replace(
+        running_source_link,
+        id=ExecutionLinkId("link-sibling"),
+        node_id=sibling.id,
+        attempt_id=AttemptId("attempt-sibling"),
+        command_id="command-sibling",
+    )
+    uow.works.aggregate = replace(
+        original,
+        graph=replace(original.graph, node_ids=(source.id, sibling.id)),
+        nodes=(source, sibling),
+        execution_links=(source_link, sibling_link),
+    )
+    control = ApprovalControlRequest(
+        kind="approval",
+        action="workspace.write",
+        resources=("repo-a",),
+        reason="Publish the result",
+    )
+    coordinator = RecordingEnqueueCoordinator(
+        lambda: cast(GovernanceUnitOfWork, uow),
+        ControlGateway(control),  # type: ignore[arg-type]
+        id_factory=SequentialIds(),
+    )
+
+    coordinator.dispatch(source.id)
+
+    stored = uow.works.aggregate
+    assert stored.work.status is WorkStatus.RUNNING
+    assert stored.nodes[0].status is WorkNodeStatus.BLOCKED
+    assert stored.nodes[0].failure_code == "control_request_unhandled"
+    assert stored.nodes[1] == sibling
+    assert stored.execution_links[1] == sibling_link
+
+
 def test_runtime_child_completion_resumes_parent_with_artifact_id_only() -> None:
     uow = FakeUow()
     accepted = _service(uow, RecordingDispatch()).propose(_command())

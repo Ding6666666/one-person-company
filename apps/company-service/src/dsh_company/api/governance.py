@@ -118,7 +118,7 @@ def _approval_projection(uow: Any, approval: Approval) -> ApprovalProjection:
 @router.put(
     "/workspaces/{workspace_id}/capabilities",
     response_model=WorkspaceCapabilities,
-    responses=not_found_response,
+    responses={**not_found_response, **{422: {"model": ErrorEnvelope}}},
 )
 def replace_workspace_capabilities(
     request: Request,

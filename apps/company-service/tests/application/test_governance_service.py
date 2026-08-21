@@ -103,6 +103,11 @@ class ApprovalRepository:
             raise RuntimeError("concurrent approval decision")
         self.items[approval.id] = approval
 
+    def list_for_workspace(self, workspace_id: WorkspaceId) -> tuple[Approval, ...]:
+        return tuple(
+            item for item in self.items.values() if item.workspace_id == workspace_id
+        )
+
 
 class FakeUow:
     def __init__(self, *, runtime_profile: str = "workspace_write") -> None:
@@ -344,6 +349,47 @@ def test_approved_action_dispatches_only_after_current_policy_recheck() -> None:
     assert aggregate.nodes[0].status is WorkNodeStatus.READY
 
 
+def test_graph_approval_rechecks_every_required_action_before_dispatch() -> None:
+    uow = FakeUow()
+    read_grant = CapabilityGrant(
+        id=CapabilityGrantId("grant-workspace-read"),
+        employee_revision_id=None,
+        action="workspace.read",
+        level=CapabilityLevel.L1,
+        resource_kind="repository",
+        resource_values=("repo-a",),
+        requires_approval=False,
+    )
+    write_grant = _grant()
+    aggregate = cast(WorkAggregate, uow.works.value)
+    uow.works.value = replace(
+        aggregate,
+        nodes=(
+            replace(
+                aggregate.nodes[0],
+                required_actions=("workspace.write", "workspace.read"),
+                resource_values=("repo-a",),
+            ),
+        ),
+    )
+    uow.workspace_grants.value = (write_grant, read_grant)
+    cast(Any, uow.employees.value).grants = (write_grant, read_grant)
+    uow.node_grants.value = (write_grant, read_grant)
+    dispatch = RecordingDispatch()
+    service = _service(uow, dispatch, deterministic_ids=True)
+    approval = service.authorize(_command())
+    assert isinstance(approval, Approval)
+    service.approve(approval.id, decided_by="operator")
+    uow.workspace_grants.value = (write_grant,)
+
+    result = service.resume_approved(approval.id)
+
+    assert result == PolicyDecision(DecisionKind.DENY, "workspace_not_granted")
+    assert dispatch.calls == []
+    updated = cast(WorkAggregate, uow.works.value)
+    assert updated.nodes[0].status is WorkNodeStatus.BLOCKED
+
+
 def test_rejection_fails_waiting_node_and_appends_safe_event() -> None:
     uow = FakeUow()
     dispatch = RecordingDispatch()
@@ -483,6 +529,34 @@ def test_multi_node_approval_resume_preserves_non_target_facts_and_order() -> No
     assert updated.nodes[1].status is WorkNodeStatus.READY
     assert updated.execution_links == original.execution_links
     assert dispatch.calls == [WorkNodeId("node-2")]
+
+
+def test_multi_node_approval_recheck_denial_preserves_running_sibling() -> None:
+    uow = FakeUow()
+    original = _multi_node(uow)
+    running_first = original.nodes[0].start(original.execution_links[0].attempt_id)
+    running_link = original.execution_links[0].mark_running()
+    uow.works.value = replace(
+        original,
+        work=original.work.start(),
+        nodes=(running_first, original.nodes[1]),
+        execution_links=(running_link, original.execution_links[1]),
+    )
+    service = _service(uow, RecordingDispatch(), deterministic_ids=True)
+    approval = service.authorize(_second_command())
+    assert isinstance(approval, Approval)
+    service.approve(approval.id, decided_by="operator")
+    uow.workspace_grants.value = ()
+
+    result = service.resume_approved(approval.id)
+
+    assert result == PolicyDecision(DecisionKind.DENY, "workspace_not_granted")
+    updated = cast(WorkAggregate, uow.works.value)
+    assert updated.work.status.value == "running"
+    assert updated.nodes[0] == running_first
+    assert updated.nodes[1].status is WorkNodeStatus.BLOCKED
+    assert updated.execution_links[0] == running_link
+    assert updated.execution_links[1].status is ExecutionStatus.BLOCKED
 
 
 def test_multi_node_rejection_changes_only_target_node_and_link() -> None:

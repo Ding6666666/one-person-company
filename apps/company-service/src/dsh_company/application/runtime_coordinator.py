@@ -531,7 +531,6 @@ class RuntimeCoordinator:
                 return
             blocked = replace(
                 aggregate,
-                work=aggregate.work.block(),
                 nodes=self._replace_node(
                     aggregate, node.block(attempt_id, diagnostic_code)
                 ),
@@ -539,6 +538,7 @@ class RuntimeCoordinator:
                     aggregate, link.block(attempt_id, diagnostic_code)
                 ),
             )
+            blocked = self._with_projected_work(blocked)
             uow.works.update(blocked)
             uow.company_events.append(
                 self._terminal_event(

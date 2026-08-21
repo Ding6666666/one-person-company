@@ -147,6 +147,15 @@ class GovernanceService:
                 ),
             )
             uow.approvals.decide(rejected)
+            for pending in uow.approvals.list_for_workspace(approval.workspace_id):
+                if (
+                    pending.id != approval.id
+                    and pending.node_id == approval.node_id
+                    and pending.status is ApprovalStatus.PENDING
+                ):
+                    uow.approvals.decide(
+                        pending.cancel(decided_by=decided_by.strip())
+                    )
             uow.works.update(failed)
             uow.company_events.append(
                 CompanyEvent(
@@ -188,6 +197,38 @@ class GovernanceService:
                 reason=approval.reason,
             )
             decision = self._decide(uow, aggregate, command)
+            if node.required_actions:
+                approvals = tuple(
+                    item
+                    for item in uow.approvals.list_for_workspace(approval.workspace_id)
+                    if item.node_id == node.id
+                )
+                if any(item.status is ApprovalStatus.PENDING for item in approvals):
+                    return PolicyDecision(
+                        DecisionKind.REQUIRE_APPROVAL,
+                        "approval_pending",
+                        frozenset(node.resource_values),
+                    )
+                for action in node.required_actions:
+                    action_decision = self._decide(
+                        uow,
+                        aggregate,
+                        GovernedAction(
+                            node_id=node.id,
+                            action=action,
+                            resources=node.resource_values,
+                            reason=approval.reason,
+                        ),
+                    )
+                    if action_decision.kind is DecisionKind.DENY:
+                        decision = action_decision
+                        break
+                else:
+                    decision = PolicyDecision(
+                        DecisionKind.ALLOW,
+                        "approved",
+                        frozenset(node.resource_values),
+                    )
             ready_node = node.approval_approved()
             if decision.kind is DecisionKind.DENY:
                 ready = self._with_node(aggregate, ready_node)
@@ -255,17 +296,20 @@ class GovernanceService:
             raise ValueError("only a ready node can be blocked before dispatch")
         if link.status is not ExecutionStatus.DISPATCH_PENDING:
             raise ValueError("governed action must be blocked before dispatch")
-        blocked = replace(
+        blocked = cls._with_link(
             cls._with_node(aggregate, node.block_before_start(reason)),
-            work=aggregate.work.block_before_start(),
-        )
-        return cls._with_link(
-            blocked,
             replace(
                 link,
                 status=ExecutionStatus.BLOCKED,
                 finished_at=datetime.now(UTC),
                 diagnostic_code=reason,
+            ),
+        )
+        return replace(
+            blocked,
+            work=replace(
+                blocked.work,
+                status=project_graph_work_status(blocked.graph, blocked.nodes),
             ),
         )
 

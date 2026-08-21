@@ -190,7 +190,7 @@ class DurableGraphEngine:
                 if not eligibility.ready:
                     continue
 
-                decision = self._policy_decision(uow, aggregate, node)
+                decision, approval_actions = self._policy_decision(uow, aggregate, node)
                 if decision.kind is DecisionKind.DENY:
                     replacement = self._block_without_attempt(node, decision.reason)
                     if replacement != node:
@@ -215,17 +215,18 @@ class DurableGraphEngine:
                         prepared,
                         status=WorkNodeStatus.WAITING_APPROVAL,
                     )
-                    uow.approvals.add(
-                        Approval.request(
-                            approval_id=ApprovalId(self._id_factory("approval")),
-                            workspace_id=aggregate.work.workspace_id,
-                            work_id=aggregate.work.id,
-                            node_id=node.id,
-                            action=decision.reason.removeprefix("approval_required:"),
-                            resources=node.resource_values,
-                            reason="Graph node requires approval",
+                    for action in approval_actions:
+                        uow.approvals.add(
+                            Approval.request(
+                                approval_id=ApprovalId(self._id_factory("approval")),
+                                workspace_id=aggregate.work.workspace_id,
+                                work_id=aggregate.work.id,
+                                node_id=node.id,
+                                action=action,
+                                resources=node.resource_values,
+                                reason="Graph node requires approval",
+                            )
                         )
-                    )
                 else:
                     ready_links.append(link)
                 capacity -= 1
@@ -302,14 +303,16 @@ class DurableGraphEngine:
         uow: GovernanceUnitOfWork,
         aggregate: WorkAggregate,
         node: WorkNode,
-    ) -> PolicyDecision:
+    ) -> tuple[PolicyDecision, tuple[str, ...]]:
         if not node.required_actions:
-            return PolicyDecision(DecisionKind.ALLOW, "granted")
+            return PolicyDecision(DecisionKind.ALLOW, "granted"), ()
         employee = uow.employees.get_revision(node.assigned_employee_id, node.employee_revision_id)
         if employee is None:
-            return PolicyDecision(DecisionKind.DENY, "employee_not_found")
+            return PolicyDecision(DecisionKind.DENY, "employee_not_found"), ()
         workspace_grants = uow.workspace_grants.list_for_workspace(aggregate.work.workspace_id)
         node_grants = uow.node_grants.list_for_node(node.id)
+        approval_actions: list[str] = []
+        approval_resources = frozenset[str]()
         for action in node.required_actions:
             workspace_grant = self._for_action(workspace_grants, action)
             employee_grant = self._for_action(employee.grants, action)
@@ -329,21 +332,27 @@ class DurableGraphEngine:
                 )
             )
             if decision.kind is DecisionKind.DENY:
-                return decision
+                return decision, ()
             requested = frozenset(node.resource_values)
             if (
                 requested
                 and "*" not in decision.effective_resources
                 and not requested.issubset(decision.effective_resources)
             ):
-                return PolicyDecision(DecisionKind.DENY, "requested_resource_not_granted")
+                return PolicyDecision(DecisionKind.DENY, "requested_resource_not_granted"), ()
             if decision.kind is DecisionKind.REQUIRE_APPROVAL:
-                return PolicyDecision(
+                approval_actions.append(action)
+                approval_resources = requested
+        if approval_actions:
+            return (
+                PolicyDecision(
                     DecisionKind.REQUIRE_APPROVAL,
-                    f"approval_required:{action}",
-                    requested,
-                )
-        return PolicyDecision(DecisionKind.ALLOW, "granted")
+                    f"approval_required:{approval_actions[0]}",
+                    approval_resources,
+                ),
+                tuple(approval_actions),
+            )
+        return PolicyDecision(DecisionKind.ALLOW, "granted"), ()
 
     @staticmethod
     def _for_action(grants: tuple[CapabilityGrant, ...], action: str) -> CapabilityGrant | None:

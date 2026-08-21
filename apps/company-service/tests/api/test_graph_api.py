@@ -158,6 +158,37 @@ def test_battle_creation_persists_parallel_graph_and_starts_after_commit(
     assert client.get(f"/works/{body['id']}").json() == body
 
 
+def test_graph_work_cancel_is_rejected_with_a_stable_conflict(
+    client: TestClient,
+) -> None:
+    workspace, employees = _seed(client)
+    created = client.post(
+        f"/workspaces/{workspace['id']}/works",
+        json={
+            **_common("graph-cancel"),
+            "kind": "graph",
+            "nodes": [
+                {
+                    "key": "approval-node",
+                    "employee_id": employees[0]["id"],
+                    "objective": "Prepare a governed change",
+                    "acceptance_criteria": ["Safe"],
+                    "required_actions": [],
+                    "resource_values": [],
+                    "resource_kinds": [],
+                }
+            ],
+            "edges": [],
+        },
+    )
+    assert created.status_code == 202
+
+    response = client.post(f"/works/{created.json()['id']}/cancel")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "work_cancel_not_supported"
+
+
 def test_same_workspace_command_is_idempotent_for_graph_creation(
     client: TestClient, graph_engine: RecordingGraphEngine
 ) -> None:

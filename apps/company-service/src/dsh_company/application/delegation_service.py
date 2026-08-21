@@ -30,6 +30,7 @@ from dsh_company.domain.work import (
     ExecutionStatus,
     WorkNode,
     WorkNodeStatus,
+    project_graph_work_status,
 )
 
 from .ports import (
@@ -386,16 +387,22 @@ class DelegationService:
             parent_link = self._active_link(aggregate, source)
             blocked_source = source.block(parent_link.attempt_id, "delegation_rejected")
             blocked_link = parent_link.block(parent_link.attempt_id, "delegation_rejected")
+            blocked = replace(
+                aggregate,
+                nodes=tuple(
+                    blocked_source if node.id == source.id else node for node in aggregate.nodes
+                ),
+                execution_links=tuple(
+                    blocked_link if link.id == parent_link.id else link
+                    for link in aggregate.execution_links
+                ),
+            )
             uow.works.update(
                 replace(
-                    aggregate,
-                    work=aggregate.work.block(),
-                    nodes=tuple(
-                        blocked_source if node.id == source.id else node for node in aggregate.nodes
-                    ),
-                    execution_links=tuple(
-                        blocked_link if link.id == parent_link.id else link
-                        for link in aggregate.execution_links
+                    blocked,
+                    work=replace(
+                        blocked.work,
+                        status=project_graph_work_status(blocked.graph, blocked.nodes),
                     ),
                 )
             )

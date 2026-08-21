@@ -269,3 +269,133 @@ def test_transport_trims_valid_core_and_grant_fields(client: TestClient) -> None
         grant for grant in employee["grants"] if grant["action"] == "workspace.write"
     )
     assert explicit["resource_kind"] == "workspace"
+
+
+@pytest.mark.parametrize(
+    "grants",
+    [
+        [
+            {
+                "action": "unknown.action",
+                "level": 1,
+                "resource_kind": "workspace",
+                "resource_values": ["*"],
+                "requires_approval": False,
+            }
+        ],
+        [
+            {
+                "action": "workspace.read",
+                "level": 3,
+                "resource_kind": "workspace",
+                "resource_values": ["*"],
+                "requires_approval": False,
+            }
+        ],
+        [
+            {
+                "action": "workspace.read",
+                "level": 1,
+                "resource_kind": "workspace",
+                "resource_values": ["*"],
+                "requires_approval": False,
+            },
+            {
+                "action": "workspace.read",
+                "level": 1,
+                "resource_kind": "workspace",
+                "resource_values": ["*"],
+                "requires_approval": False,
+            },
+        ],
+    ],
+)
+def test_invalid_employee_grant_catalog_facts_are_rejected(
+    client: TestClient, grants: list[dict[str, object]]
+) -> None:
+    workspace = client.post("/workspaces", json={"name": "Catalog"}).json()
+    payload = _employee_payload()
+    payload["grants"] = grants
+
+    response = client.post(
+        f"/workspaces/{workspace['id']}/employees",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert client.get(f"/workspaces/{workspace['id']}/employees").json() == []
+
+
+def test_invalid_revised_employee_grant_does_not_create_a_revision(
+    client: TestClient,
+) -> None:
+    workspace = client.post("/workspaces", json={"name": "Catalog"}).json()
+    employee = client.post(
+        f"/workspaces/{workspace['id']}/employees",
+        json=_employee_payload(),
+    ).json()
+
+    response = client.post(
+        f"/employees/{employee['id']}/revisions",
+        json={
+            "responsibility": "invalid catalog revision",
+            "runtime_profile": "workspace_read",
+            "model": "deepseek-v4-flash",
+            "grants": [
+                {
+                    "action": "unknown.action",
+                    "level": 1,
+                    "resource_kind": "workspace",
+                    "resource_values": [workspace["id"]],
+                    "requires_approval": False,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 422
+    current = client.get(f"/employees/{employee['id']}").json()
+    assert current["revision"]["revision_number"] == 1
+
+
+def test_registered_plugin_action_is_valid_for_employee_grants(client: TestClient) -> None:
+    registered = client.post(
+        "/business-plugins/register",
+        json={
+            "plugin_id": "content-studio",
+            "version": "1.0.0",
+            "display_name": "Content Studio",
+            "capability_actions": [
+                {
+                    "action": "content-studio.publish",
+                    "level": 3,
+                    "runtime_profiles": ["workspace_write"],
+                }
+            ],
+            "templates": [],
+        },
+    )
+    assert registered.status_code == 201
+    workspace = client.post("/workspaces", json={"name": "Catalog"}).json()
+    payload = _employee_payload()
+    payload["runtime_profile"] = "workspace_write"
+    payload["grants"] = [
+        {
+            "action": "content-studio.publish",
+            "level": 3,
+            "resource_kind": "workspace",
+            "resource_values": [workspace["id"]],
+            "requires_approval": True,
+        }
+    ]
+
+    response = client.post(
+        f"/workspaces/{workspace['id']}/employees",
+        json=payload,
+    )
+
+    assert response.status_code == 201
+    assert any(
+        grant["action"] == "content-studio.publish"
+        for grant in response.json()["grants"]
+    )

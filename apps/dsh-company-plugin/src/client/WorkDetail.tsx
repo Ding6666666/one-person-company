@@ -61,7 +61,8 @@ export function WorkDetail({ work, events, pending, onCancel, governance, employ
 }) {
   const [governanceOpen, setGovernanceOpen] = useState(false)
   const cancelRequested = work.execution_links.some(link => link.status === 'cancel_requested')
-  const canCancel = work.execution_links.some(link => link.status === 'dispatch_pending' || link.status === 'running')
+  const canCancel = work.strategy === 'direct'
+    && work.execution_links.some(link => link.status === 'dispatch_pending' || link.status === 'running')
   const status = work.status === 'cancelled'
     ? t('statusCancelled')
     : cancelRequested

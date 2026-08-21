@@ -8,7 +8,7 @@ from dsh_company.domain.ids import (
     WorkspaceId,
     new_id,
 )
-from dsh_company.domain.work import CompanyEvent, ExecutionLink, Work
+from dsh_company.domain.work import CompanyEvent, ExecutionLink, Work, WorkStrategy
 
 from .ports import (
     DuplicateCommand,
@@ -112,7 +112,13 @@ class WorkService:
         self, work_id: WorkId, coordinator: WorkCoordinator
     ) -> WorkAggregate:
         aggregate = self.get(work_id)
-        if len(aggregate.nodes) != 1:
-            raise RuntimeError("direct work requires exactly one node")
+        if aggregate.graph.strategy is not WorkStrategy.DIRECT or len(aggregate.nodes) != 1:
+            raise WorkCancellationNotSupported(
+                "cancellation is currently supported only for Direct work"
+            )
         coordinator.request_cancel(aggregate.nodes[0].id)
         return self.get(work_id)
+
+
+class WorkCancellationNotSupported(ValueError):
+    """The public DSH cancellation boundary cannot cancel an entire Work graph."""

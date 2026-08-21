@@ -9,10 +9,11 @@ from dsh_company.application.commands import (
     ReviseEmployee,
 )
 from dsh_company.application.company_service import CompanyService
+from dsh_company.business_plugins.registry import BusinessPluginRegistry
 from dsh_company.domain.capabilities import CapabilityLevel
 from dsh_company.domain.ids import EmployeeId, WorkspaceId
 
-from .errors import ErrorEnvelope, ResourceNotFoundError
+from .errors import ErrorEnvelope, ResourceNotFoundError, UnprocessableEntityError
 from .schemas import (
     Employee,
     EmployeeCreate,
@@ -24,6 +25,7 @@ from .schemas import (
 
 router = APIRouter()
 not_found_response: dict[int | str, dict[str, Any]] = {404: {"model": ErrorEnvelope}}
+grant_error_responses: dict[int | str, dict[str, Any]] = {422: {"model": ErrorEnvelope}}
 
 
 def _company_service(request: Request) -> CompanyService:
@@ -44,6 +46,25 @@ def _grants(items: list[GrantCreate]) -> tuple[GrantInput, ...]:
         )
         for item in items
     )
+
+
+def _validate_grants(request: Request, items: list[GrantCreate]) -> None:
+    actions = [item.action for item in items]
+    if len(items) > 8 or len(actions) != len(set(actions)):
+        raise UnprocessableEntityError(
+            "invalid_capability_grant",
+            "employee capability grants must contain at most eight unique actions",
+        )
+    catalog = BusinessPluginRegistry(request.app.state.assembly.uow_factory).action_catalog()
+    if any(
+        (required_level := catalog.level(item.action)) is None
+        or int(required_level) != item.level
+        for item in items
+    ):
+        raise UnprocessableEntityError(
+            "invalid_capability_grant",
+            "capability action and level must match the registered catalog",
+        )
 
 
 @router.post(
@@ -84,13 +105,15 @@ def get_workspace(
     "/workspaces/{workspace_id}/employees",
     response_model=Employee,
     status_code=status.HTTP_201_CREATED,
-    responses=not_found_response,
+    responses={**not_found_response, **grant_error_responses},
 )
 def create_employee(
+    request: Request,
     workspace_id: str,
     body: EmployeeCreate,
     service: CompanyServiceDependency,
 ) -> Employee:
+    _validate_grants(request, body.grants)
     try:
         record = service.create_employee(
             CreateEmployee(
@@ -141,13 +164,15 @@ def get_employee(
 @router.post(
     "/employees/{employee_id}/revisions",
     response_model=Employee,
-    responses=not_found_response,
+    responses={**not_found_response, **grant_error_responses},
 )
 def revise_employee(
+    request: Request,
     employee_id: str,
     body: EmployeeRevise,
     service: CompanyServiceDependency,
 ) -> Employee:
+    _validate_grants(request, body.grants)
     try:
         record = service.revise_employee(
             ReviseEmployee(
