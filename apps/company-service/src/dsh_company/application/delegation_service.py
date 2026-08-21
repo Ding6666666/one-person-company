@@ -64,7 +64,7 @@ class DelegationResult:
 class DelegationCompletion:
     delegation: Delegation
     parent_node: WorkNode
-    input_references: tuple[ArtifactReferenceId, ...]
+    input_references: tuple[ArtifactReferenceId | WorkNodeId, ...]
 
 
 class DelegationService:

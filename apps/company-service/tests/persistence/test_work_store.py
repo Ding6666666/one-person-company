@@ -142,6 +142,66 @@ def test_direct_graph_and_attempt_round_trip(
     assert stored.work.created_at.tzinfo is UTC
 
 
+def test_graph_node_execution_fields_round_trip(
+    sqlite_uow: SqlAlchemyUnitOfWork,
+) -> None:
+    aggregate = _aggregate()
+    with sqlite_uow as uow:
+        revision_id = _seed_company(uow)
+        node = replace(
+            aggregate.nodes[0],
+            employee_revision_id=revision_id,
+            required_actions=("workspace.read", "tool.network"),
+            resource_values=("ws-1", "network"),
+            output_references=(ArtifactReferenceId("artifact-work-1"),),
+            max_attempts=3,
+            attempt_count=1,
+        )
+        aggregate = replace(aggregate, nodes=(node,))
+        uow.works.add(aggregate)
+        uow.commit()
+
+    with sqlite_uow as uow:
+        stored = uow.works.get(aggregate.work.id)
+
+    assert stored == aggregate
+
+
+def test_completed_node_output_reference_survives_update_and_reload(
+    sqlite_uow: SqlAlchemyUnitOfWork,
+) -> None:
+    aggregate = _aggregate(status=ExecutionStatus.RUNNING)
+    with sqlite_uow as uow:
+        revision_id = _seed_company(uow)
+        aggregate = replace(
+            aggregate,
+            nodes=(replace(aggregate.nodes[0], employee_revision_id=revision_id),),
+        )
+        uow.works.add(aggregate)
+        uow.commit()
+
+    attempt_id = aggregate.execution_links[0].attempt_id
+    artifact_id = aggregate.artifacts[0].id
+    completed = replace(
+        aggregate,
+        work=aggregate.work.complete(),
+        nodes=(aggregate.nodes[0].complete(attempt_id, artifact_id),),
+        execution_links=(
+            aggregate.execution_links[0].complete(attempt_id, artifact_id),
+        ),
+    )
+    with sqlite_uow as uow:
+        uow.works.update(completed)
+        uow.commit()
+
+    with sqlite_uow as uow:
+        stored = uow.works.get(completed.work.id)
+
+    assert stored == completed
+    assert stored is not None
+    assert stored.nodes[0].output_references == (artifact_id,)
+
+
 def test_reloaded_direct_graph_can_be_delegated_without_rewriting_node_facts(
     sqlite_uow: SqlAlchemyUnitOfWork,
 ) -> None:
@@ -476,3 +536,104 @@ def test_alembic_metadata_matches_migrated_work_schema(
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_node_graph_fields_migration_backfills_and_round_trips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "node-fields.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DSH_COMPANY_DATABASE_URL", database_url)
+    config = Config("apps/company-service/alembic.ini")
+    command.upgrade(config, "0004_delegation_inputs")
+
+    engine = create_sqlite_engine(database_path)
+    now = datetime.now(UTC).isoformat()
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)",
+            ("ws-migration", "Migration", now),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO employees "
+            "(id, workspace_id, display_name, status, current_revision_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("emp-migration", "ws-migration", "Employee", "active", "rev-migration", now),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO employee_revisions "
+            "(id, employee_id, revision_number, responsibility, runtime_profile, model, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "rev-migration",
+                "emp-migration",
+                1,
+                "Test",
+                "workspace_read",
+                "model",
+                now,
+            ),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO works "
+            "(id, workspace_id, command_id, objective, status, current_graph_revision_id, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "work-migration",
+                "ws-migration",
+                "cmd-migration",
+                "Test",
+                "queued",
+                "graph-migration",
+                now,
+            ),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO work_graph_revisions "
+            "(id, work_id, revision_number, strategy, created_at) VALUES (?, ?, ?, ?, ?)",
+            ("graph-migration", "work-migration", 1, "direct", now),
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO work_nodes "
+            "(id, graph_revision_id, work_id, objective, acceptance_criteria_json, "
+            "input_references_json, assigned_employee_id, employee_revision_id, status, "
+            "active_attempt_id, failure_code, version) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "node-migration",
+                "graph-migration",
+                "work-migration",
+                "Test",
+                '["done"]',
+                "[]",
+                "emp-migration",
+                "rev-migration",
+                "ready",
+                None,
+                None,
+                1,
+            ),
+        )
+    engine.dispose()
+
+    command.upgrade(config, "head")
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT required_actions_json, resource_values_json, output_references_json, "
+            "max_attempts, attempt_count FROM work_nodes WHERE id = ?",
+            ("node-migration",),
+        ).one()
+    engine.dispose()
+    assert row == ("[]", "[]", "[]", 1, 0)
+
+    command.downgrade(config, "0004_delegation_inputs")
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        columns = {
+            row[1] for row in connection.exec_driver_sql("PRAGMA table_info(work_nodes)")
+        }
+    engine.dispose()
+    assert "required_actions_json" not in columns
+
+    command.upgrade(config, "head")

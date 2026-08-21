@@ -132,6 +132,7 @@ def test_node_completion_requires_matching_attempt_and_result_reference() -> Non
 
     completed = node.complete(AttemptId("attempt-1"), ArtifactReferenceId("artifact-1"))
     assert completed.status is WorkNodeStatus.COMPLETED
+    assert completed.output_references == (ArtifactReferenceId("artifact-1"),)
     assert node.status is WorkNodeStatus.RUNNING
 
 

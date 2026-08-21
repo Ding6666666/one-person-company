@@ -89,6 +89,8 @@ def apply_delegation(
         work_id=original.work_id,
         objective=proposal.objective,
         acceptance_criteria=proposal.acceptance_criteria,
+        required_actions=tuple(proposal.required_actions),
+        resource_values=tuple(proposal.resource_values),
         assigned_employee_id=proposal.target_employee_id,
         employee_revision_id=target_employee_revision_id,
         status=WorkNodeStatus.READY,

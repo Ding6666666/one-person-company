@@ -141,6 +141,8 @@ def test_pending_approval_delegation_and_graph_revision_survive_restart(
     assert graph_2[0].node_ids == (WorkNodeId("node-1"), WorkNodeId("node-2"))
     assert graph_2[0].edges[-1].kind is WorkEdgeKind.DELEGATES_TO
     assert graph_2[1][0] == original.nodes[0]
+    assert graph_2[1][-1].required_actions == ("workspace.read",)
+    assert graph_2[1][-1].resource_values == ("ws-1",)
 
 
 def test_workspace_and_node_capability_grants_round_trip(tmp_path: Path) -> None:

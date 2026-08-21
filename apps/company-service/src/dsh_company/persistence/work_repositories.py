@@ -87,7 +87,12 @@ class WorkRepository:
                 work_id=node.work_id,
                 objective=node.objective,
                 acceptance_criteria_json=json.dumps(node.acceptance_criteria, ensure_ascii=False),
+                required_actions_json=json.dumps(node.required_actions, ensure_ascii=False),
+                resource_values_json=json.dumps(node.resource_values, ensure_ascii=False),
                 input_references_json=json.dumps(node.input_references, ensure_ascii=False),
+                output_references_json=json.dumps(node.output_references, ensure_ascii=False),
+                max_attempts=node.max_attempts,
+                attempt_count=node.attempt_count,
                 assigned_employee_id=node.assigned_employee_id,
                 employee_revision_id=node.employee_revision_id,
                 status=node.status.value,
@@ -301,9 +306,20 @@ class WorkRepository:
                         acceptance_criteria_json=json.dumps(
                             node.acceptance_criteria, ensure_ascii=False
                         ),
+                        required_actions_json=json.dumps(
+                            node.required_actions, ensure_ascii=False
+                        ),
+                        resource_values_json=json.dumps(
+                            node.resource_values, ensure_ascii=False
+                        ),
                         input_references_json=json.dumps(
                             node.input_references, ensure_ascii=False
                         ),
+                        output_references_json=json.dumps(
+                            node.output_references, ensure_ascii=False
+                        ),
+                        max_attempts=node.max_attempts,
+                        attempt_count=node.attempt_count,
                         assigned_employee_id=node.assigned_employee_id,
                         employee_revision_id=node.employee_revision_id,
                         status=node.status.value,
@@ -407,10 +423,18 @@ class WorkRepository:
             work_id=WorkId(row.work_id),
             objective=row.objective,
             acceptance_criteria=tuple(json.loads(row.acceptance_criteria_json)),
+            required_actions=tuple(json.loads(row.required_actions_json)),
+            resource_values=tuple(json.loads(row.resource_values_json)),
             input_references=tuple(
                 ArtifactReferenceId(value)
                 for value in json.loads(row.input_references_json)
             ),
+            output_references=tuple(
+                ArtifactReferenceId(value)
+                for value in json.loads(row.output_references_json)
+            ),
+            max_attempts=row.max_attempts,
+            attempt_count=row.attempt_count,
             assigned_employee_id=EmployeeId(row.assigned_employee_id),
             employee_revision_id=EmployeeRevisionId(row.employee_revision_id),
             status=WorkNodeStatus(row.status),
@@ -429,7 +453,12 @@ class WorkRepository:
             work_id=node.work_id,
             objective=node.objective,
             acceptance_criteria_json=json.dumps(node.acceptance_criteria, ensure_ascii=False),
+            required_actions_json=json.dumps(node.required_actions, ensure_ascii=False),
+            resource_values_json=json.dumps(node.resource_values, ensure_ascii=False),
             input_references_json=json.dumps(node.input_references, ensure_ascii=False),
+            output_references_json=json.dumps(node.output_references, ensure_ascii=False),
+            max_attempts=node.max_attempts,
+            attempt_count=node.attempt_count,
             assigned_employee_id=node.assigned_employee_id,
             employee_revision_id=node.employee_revision_id,
             status=node.status.value,

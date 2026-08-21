@@ -27,6 +27,7 @@ class WorkStatus(StrEnum):
 
 
 class WorkNodeStatus(StrEnum):
+    DRAFT = "draft"
     READY = "ready"
     WAITING_APPROVAL = "waiting_approval"
     RUNNING = "running"
@@ -53,6 +54,8 @@ class WorkStrategy(StrEnum):
 class WorkEdgeKind(StrEnum):
     DEPENDS_ON = "depends_on"
     DELEGATES_TO = "delegates_to"
+    REVIEWS = "reviews"
+    SUMMARIZES = "summarizes"
 
 
 def _expect_status(actual: StrEnum, expected: StrEnum) -> None:
@@ -127,7 +130,12 @@ class WorkNode:
     active_attempt_id: AttemptId | None
     failure_code: str | None
     version: int
-    input_references: tuple[ArtifactReferenceId, ...] = ()
+    required_actions: tuple[str, ...] = ()
+    resource_values: tuple[str, ...] = ()
+    input_references: tuple[ArtifactReferenceId | WorkNodeId, ...] = ()
+    output_references: tuple[ArtifactReferenceId, ...] = ()
+    max_attempts: int = 1
+    attempt_count: int = 0
 
     def wait_for_approval(self) -> "WorkNode":
         _expect_status(self.status, WorkNodeStatus.READY)
@@ -187,6 +195,7 @@ class WorkNode:
             self,
             status=WorkNodeStatus.COMPLETED,
             failure_code=None,
+            output_references=(*self.output_references, result_reference_id),
             version=self.version + 1,
         )
 

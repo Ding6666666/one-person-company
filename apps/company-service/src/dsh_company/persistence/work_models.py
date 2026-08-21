@@ -71,7 +71,12 @@ class WorkNodeRow(Base):
     work_id: Mapped[str] = mapped_column(ForeignKey("works.id"), nullable=False)
     objective: Mapped[str] = mapped_column(Text, nullable=False)
     acceptance_criteria_json: Mapped[str] = mapped_column(Text, nullable=False)
+    required_actions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    resource_values_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     input_references_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    output_references_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     assigned_employee_id: Mapped[str] = mapped_column(ForeignKey("employees.id"), nullable=False)
     employee_revision_id: Mapped[str] = mapped_column(
         ForeignKey("employee_revisions.id"), nullable=False

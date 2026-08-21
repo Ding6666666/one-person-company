@@ -343,6 +343,7 @@ def test_openapi_publishes_closed_authoritative_work_statuses(
         "cancelled",
     }
     assert set(schemas["WorkNodeStatus"]["enum"]) == {
+        "draft",
         "ready",
         "waiting_approval",
         "running",

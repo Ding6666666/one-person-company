@@ -95,6 +95,8 @@ def test_delegation_creates_new_revision_without_rewriting_completed_nodes() -> 
     assert revised.nodes[:2] == (completed, parent)
     assert revised.nodes[0] is completed
     assert revised.nodes[-1].status is WorkNodeStatus.READY
+    assert revised.nodes[-1].required_actions == proposal.required_actions
+    assert revised.nodes[-1].resource_values == proposal.resource_values
     assert revised.graph.node_ids == tuple(node.id for node in revised.nodes)
     assert revised.graph.edges[:-1] == original.edges
     assert revised.graph.edges[-1] == WorkEdge(
