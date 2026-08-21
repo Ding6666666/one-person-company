@@ -1,0 +1,32 @@
+.workList,
+.detail {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.workList header,
+.detail > header,
+.detail > header > div,
+.actions,
+.artifacts div {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.detail > header { justify-content: space-between; }
+.detail h2,
+.detail h3 { margin: 0; }
+.workList ul,
+.history ol { display: grid; gap: 0.65rem; margin: 0; padding-left: 1.25rem; }
+.workList a { color: #174ea6; }
+.composer { display: grid; gap: 1rem; }
+.composer textarea { min-height: 5rem; resize: vertical; }
+.actions { justify-content: flex-end; }
+.badge { background: #edf2f7; border-radius: 999px; padding: 0.2rem 0.65rem; }
+.history { border-top: 1px solid #d7dee5; display: grid; gap: 0.75rem; padding-top: 1rem; }
+.history li { display: grid; gap: 0.2rem; }
+.eventType { color: #52606d; font-size: 0.8rem; }
+.artifacts { display: grid; gap: 0.75rem; }
+.artifacts input { flex: 1; min-width: 0; }

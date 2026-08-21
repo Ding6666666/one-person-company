@@ -1,6 +1,15 @@
 import { useSyncExternalStore } from 'react'
 
-import { ApiError, type Employee, type EmployeeCreate, ProductApi, type Workspace } from './api.js'
+import {
+  ApiError,
+  type CompanyEvent,
+  type DirectWorkCreate,
+  type Employee,
+  type EmployeeCreate,
+  ProductApi,
+  type WorkProjection,
+  type Workspace,
+} from './api.js'
 
 export interface CompanySnapshot {
   readonly phase: 'loading' | 'ready' | 'error'
@@ -9,6 +18,10 @@ export interface CompanySnapshot {
   readonly workspaces: readonly Workspace[]
   readonly selectedWorkspaceId: string | undefined
   readonly employees: readonly Employee[]
+  readonly works: readonly WorkProjection[]
+  readonly selectedWorkId: string | undefined
+  readonly selectedWork: WorkProjection | undefined
+  readonly events: readonly CompanyEvent[]
 }
 
 const initialSnapshot: CompanySnapshot = {
@@ -18,12 +31,18 @@ const initialSnapshot: CompanySnapshot = {
   workspaces: [],
   selectedWorkspaceId: undefined,
   employees: [],
+  works: [],
+  selectedWorkId: undefined,
+  selectedWork: undefined,
+  events: [],
 }
 
 export class CompanyController {
   private current = initialSnapshot
   private readonly listeners = new Set<() => void>()
   private selectionGeneration = 0
+  private workRefreshGeneration = 0
+  private workListGeneration = 0
 
   constructor(private readonly api: ProductApi) {}
 
@@ -33,11 +52,14 @@ export class CompanyController {
     return () => { this.listeners.delete(listener) }
   }
 
-  async load(): Promise<void> {
+  async load(initialWorkspaceId?: string): Promise<void> {
     this.publish({ ...this.current, phase: 'loading', error: undefined })
     try {
       const workspaces = await this.api.listWorkspaces()
       this.publish({ ...this.current, phase: 'ready', workspaces, error: undefined })
+      if (initialWorkspaceId !== undefined && workspaces.some(workspace => workspace.id === initialWorkspaceId)) {
+        await this.selectWorkspace(initialWorkspaceId)
+      }
     } catch (error) {
       this.fail(error)
     }
@@ -63,12 +85,18 @@ export class CompanyController {
 
   async selectWorkspace(workspaceId: string): Promise<void> {
     const generation = ++this.selectionGeneration
+    this.workListGeneration += 1
+    this.workRefreshGeneration += 1
     this.publish({
       ...this.current,
       phase: 'loading',
       pending: false,
       selectedWorkspaceId: workspaceId,
       employees: [],
+      works: [],
+      selectedWorkId: undefined,
+      selectedWork: undefined,
+      events: [],
       error: undefined,
     })
     try {
@@ -100,6 +128,103 @@ export class CompanyController {
       if (this.isCurrentSelection(generation, workspaceId)) this.fail(error)
       return undefined
     }
+  }
+
+  async loadWorks(): Promise<void> {
+    const workspaceId = this.current.selectedWorkspaceId
+    if (workspaceId === undefined) return
+    const generation = this.selectionGeneration
+    const listGeneration = ++this.workListGeneration
+    this.publish({ ...this.current, phase: 'loading', error: undefined })
+    try {
+      const works = await this.api.listWorks(workspaceId)
+      if (!this.isCurrentSelection(generation, workspaceId) || listGeneration !== this.workListGeneration) return
+      this.publish({ ...this.current, phase: 'ready', works, error: undefined })
+    } catch (error) {
+      if (this.isCurrentSelection(generation, workspaceId) && listGeneration === this.workListGeneration) {
+        this.fail(error)
+      }
+    }
+  }
+
+  async createDirectWork(input: DirectWorkCreate): Promise<WorkProjection | undefined> {
+    const workspaceId = this.current.selectedWorkspaceId
+    if (workspaceId === undefined) return undefined
+    const generation = this.selectionGeneration
+    this.workListGeneration += 1
+    this.publish({ ...this.current, pending: true, error: undefined })
+    try {
+      const work = await this.api.createDirectWork(workspaceId, input)
+      if (!this.isCurrentSelection(generation, workspaceId)) return undefined
+      const works = [...this.current.works.filter(item => item.id !== work.id), work]
+      this.workRefreshGeneration += 1
+      this.publish({
+        ...this.current,
+        phase: 'ready',
+        pending: false,
+        error: undefined,
+        works,
+        selectedWorkId: work.id,
+        selectedWork: work,
+        events: [],
+      })
+      return work
+    } catch (error) {
+      if (this.isCurrentSelection(generation, workspaceId)) this.fail(error)
+      return undefined
+    }
+  }
+
+  async selectWork(workId: string): Promise<void> {
+    this.workRefreshGeneration += 1
+    this.publish({
+      ...this.current,
+      pending: false,
+      selectedWorkId: workId,
+      selectedWork: undefined,
+      events: [],
+      error: undefined,
+    })
+    await this.refreshWork(workId)
+  }
+
+  async refreshSelectedWork(): Promise<void> {
+    const workId = this.current.selectedWorkId
+    if (workId !== undefined) await this.refreshWork(workId)
+  }
+
+  async cancelSelectedWork(): Promise<void> {
+    const workId = this.current.selectedWorkId
+    if (workId === undefined) return
+    const generation = ++this.workRefreshGeneration
+    this.publish({ ...this.current, pending: true, error: undefined })
+    try {
+      const work = await this.api.cancelWork(workId)
+      if (generation !== this.workRefreshGeneration || this.current.selectedWorkId !== workId) return
+      this.replaceWork(work, { pending: false, phase: 'ready', error: undefined })
+    } catch (error) {
+      if (generation === this.workRefreshGeneration && this.current.selectedWorkId === workId) this.fail(error)
+    }
+  }
+
+  private async refreshWork(workId: string): Promise<void> {
+    const generation = ++this.workRefreshGeneration
+    try {
+      const [work, events] = await Promise.all([this.api.getWork(workId), this.api.listWorkEvents(workId)])
+      if (generation !== this.workRefreshGeneration || this.current.selectedWorkId !== workId) return
+      this.replaceWork(work, { phase: 'ready', error: undefined, events })
+    } catch (error) {
+      if (generation === this.workRefreshGeneration && this.current.selectedWorkId === workId) this.fail(error)
+    }
+  }
+
+  private replaceWork(work: WorkProjection, changes: Partial<CompanySnapshot>): void {
+    this.publish({
+      ...this.current,
+      ...changes,
+      selectedWork: work,
+      works: this.current.works.map(item => item.id === work.id ? work : item),
+    })
   }
 
   private isCurrentSelection(generation: number, workspaceId: string): boolean {

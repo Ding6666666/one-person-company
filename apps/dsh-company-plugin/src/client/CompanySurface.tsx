@@ -11,6 +11,9 @@ import { EmployeeForm } from './EmployeeForm.js'
 import { NS, type CompanyLocale, translate, type Translate } from './locales.js'
 import styles from './CompanySurface.module.css'
 import { Button, Dialog, Field } from './ui/Primitives.js'
+import { WorkComposer } from './WorkComposer.js'
+import { WorkDetail } from './WorkDetail.js'
+import { WorkList } from './WorkList.js'
 import { WorkspaceList } from './WorkspaceList.js'
 
 const alwaysOpen = (): boolean => true
@@ -21,13 +24,24 @@ export interface CompanySurfaceProps {
   readonly locale?: CompanyLocale
   readonly t?: Translate
   readonly overlay?: CompanyOverlayController
+  readonly initialWorkspaceId?: string | undefined
+  readonly pollingIntervalMs?: number | undefined
 }
 
-export function CompanySurface({ remote, locale = 'zh', t: suppliedTranslate, overlay }: CompanySurfaceProps) {
+export function CompanySurface({
+  remote,
+  locale = 'zh',
+  t: suppliedTranslate,
+  overlay,
+  initialWorkspaceId,
+  pollingIntervalMs = 1_000,
+}: CompanySurfaceProps) {
   const controller = useMemo(() => new CompanyController(new ProductApi(remote)), [remote])
   const snapshot = useCompanyController(controller)
   const [workspaceDialog, setWorkspaceDialog] = useState(false)
   const [employeeDialog, setEmployeeDialog] = useState(false)
+  const [workDialog, setWorkDialog] = useState(false)
+  const [view, setView] = useState<'employees' | 'work'>('employees')
   const [workspaceName, setWorkspaceName] = useState('')
   const [workspaceError, setWorkspaceError] = useState<string>()
   const t = suppliedTranslate ?? translate(locale)
@@ -37,7 +51,31 @@ export function CompanySurface({ remote, locale = 'zh', t: suppliedTranslate, ov
     overlay?.snapshot ?? alwaysOpen,
   )
 
-  useEffect(() => { void controller.load() }, [controller])
+  useEffect(() => { void controller.load(initialWorkspaceId) }, [controller, initialWorkspaceId])
+  useEffect(() => {
+    if (
+      snapshot.selectedWorkId === undefined
+      || snapshot.selectedWork === undefined
+      || snapshot.pending
+      || snapshot.selectedWork?.status === 'completed'
+      || snapshot.selectedWork?.status === 'failed'
+      || snapshot.selectedWork?.status === 'cancelled'
+    ) return
+    let stopped = false
+    let timer: ReturnType<typeof globalThis.setTimeout> | undefined
+    const schedule = (): void => {
+      timer = globalThis.setTimeout(() => {
+        void controller.refreshSelectedWork().then(() => {
+          if (!stopped) schedule()
+        })
+      }, pollingIntervalMs)
+    }
+    schedule()
+    return () => {
+      stopped = true
+      if (timer !== undefined) globalThis.clearTimeout(timer)
+    }
+  }, [controller, pollingIntervalMs, snapshot.pending, snapshot.selectedWork?.status, snapshot.selectedWorkId])
 
   const closeWorkspaceDialog = useCallback(() => {
     setWorkspaceDialog(false)
@@ -45,6 +83,12 @@ export function CompanySurface({ remote, locale = 'zh', t: suppliedTranslate, ov
     setWorkspaceError(undefined)
   }, [])
   const closeEmployeeDialog = useCallback(() => setEmployeeDialog(false), [])
+  const closeWorkDialog = useCallback(() => setWorkDialog(false), [])
+
+  const showWork = (): void => {
+    setView('work')
+    void controller.loadWorks()
+  }
 
   const submitWorkspace = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
@@ -69,16 +113,47 @@ export function CompanySurface({ remote, locale = 'zh', t: suppliedTranslate, ov
       <WorkspaceList
         workspaces={snapshot.workspaces}
         selectedWorkspaceId={snapshot.selectedWorkspaceId}
-        onSelect={workspaceId => { void controller.selectWorkspace(workspaceId) }}
+        onSelect={workspaceId => {
+          void controller.selectWorkspace(workspaceId).then(() => {
+            if (view === 'work') void controller.loadWorks()
+          })
+        }}
         onCreate={() => setWorkspaceDialog(true)}
         t={t}
       />
-      <EmployeeDirectory
-        employees={snapshot.employees}
-        workspaceSelected={snapshot.selectedWorkspaceId !== undefined}
-        onCreate={() => setEmployeeDialog(true)}
-        t={t}
-      />
+      <section className={styles.content}>
+        <nav className={styles.tabs} aria-label={t('title')}>
+          <a href="#employees" aria-current={view === 'employees' ? 'page' : undefined} onClick={(event) => {
+            event.preventDefault(); setView('employees')
+          }}>{t('employees')}</a>
+          <a href="#work" aria-current={view === 'work' ? 'page' : undefined} onClick={(event) => {
+            event.preventDefault(); showWork()
+          }}>{t('work')}</a>
+        </nav>
+        {view === 'employees' && <EmployeeDirectory
+          employees={snapshot.employees}
+          workspaceSelected={snapshot.selectedWorkspaceId !== undefined}
+          onCreate={() => setEmployeeDialog(true)}
+          t={t}
+        />}
+        {view === 'work' && <div className={styles.workLayout}>
+          <WorkList
+            works={snapshot.works}
+            workspaceSelected={snapshot.selectedWorkspaceId !== undefined}
+            selectedWorkId={snapshot.selectedWorkId}
+            onSelect={workId => { void controller.selectWork(workId) }}
+            onCreate={() => setWorkDialog(true)}
+            t={t}
+          />
+          {snapshot.selectedWork !== undefined && <WorkDetail
+            work={snapshot.selectedWork}
+            events={snapshot.events}
+            pending={snapshot.pending}
+            onCancel={() => { void controller.cancelSelectedWork() }}
+            t={t}
+          />}
+        </div>}
+      </section>
     </main>
 
     {workspaceDialog && <Dialog title={t('createWorkspace')} onClose={closeWorkspaceDialog}>
@@ -99,6 +174,18 @@ export function CompanySurface({ remote, locale = 'zh', t: suppliedTranslate, ov
         onSave={async (input) => {
           const created = await controller.createEmployee(input)
           if (created !== undefined) closeEmployeeDialog()
+        }}
+        t={t}
+      />
+    </Dialog>}
+    {workDialog && snapshot.selectedWorkspaceId !== undefined && <Dialog title={t('createWork')} onClose={closeWorkDialog}>
+      <WorkComposer
+        employees={snapshot.employees}
+        pending={snapshot.pending}
+        onCancel={closeWorkDialog}
+        onStart={async input => {
+          const created = await controller.createDirectWork(input)
+          if (created !== undefined) closeWorkDialog()
         }}
         t={t}
       />

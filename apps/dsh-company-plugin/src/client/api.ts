@@ -18,6 +18,9 @@ export type Workspace = ApiSchemas['Workspace']
 export type Employee = ApiSchemas['Employee']
 export type WorkspaceCreate = ApiSchemas['WorkspaceCreate']
 export type EmployeeCreate = ApiSchemas['EmployeeCreate']
+export type DirectWorkCreate = ApiSchemas['DirectWorkCreate']
+export type WorkProjection = ApiSchemas['WorkProjection']
+export type CompanyEvent = ApiSchemas['CompanyEvent']
 
 const workspaceSchema: z.ZodType<Workspace> = z.object({
   id: z.string(),
@@ -60,6 +63,60 @@ const employeeSchema: z.ZodType<Employee> = z.object({
   revision: revisionSchema,
   binding: bindingSchema,
   grants: z.array(grantSchema),
+})
+const workNodeStatusSchema = z.enum(['ready', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
+const workStatusSchema = z.enum(['queued', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
+const executionStatusSchema = z.enum([
+  'dispatch_pending', 'running', 'cancel_requested', 'blocked', 'completed', 'failed', 'cancelled',
+])
+const workProjectionSchema: z.ZodType<WorkProjection> = z.object({
+  id: z.string(),
+  workspace_id: z.string(),
+  command_id: z.string(),
+  objective: z.string(),
+  status: workStatusSchema,
+  graph_revision_id: z.string(),
+  graph_revision_number: z.number(),
+  strategy: z.literal('direct'),
+  nodes: z.array(z.object({
+    id: z.string(),
+    objective: z.string(),
+    acceptance_criteria: z.array(z.string()),
+    assigned_employee_id: z.string(),
+    employee_revision_id: z.string(),
+    status: workNodeStatusSchema,
+    active_attempt_id: z.string().nullable(),
+    failure_code: z.string().nullable(),
+    version: z.number(),
+  })),
+  execution_links: z.array(z.object({
+    id: z.string(),
+    node_id: z.string(),
+    attempt_id: z.string(),
+    status: executionStatusSchema,
+    started_at: z.string().nullable(),
+    finished_at: z.string().nullable(),
+    diagnostic_code: z.string().nullable(),
+  })),
+  artifacts: z.array(z.object({
+    id: z.string(),
+    kind: z.literal('dsh_session_result'),
+    uri: z.string(),
+    created_at: z.string(),
+  })),
+  created_at: z.string(),
+})
+const companyEventSchema: z.ZodType<CompanyEvent> = z.object({
+  id: z.string(),
+  workspace_id: z.string(),
+  work_id: z.string(),
+  node_id: z.string().nullable(),
+  attempt_id: z.string().nullable(),
+  source_sequence: z.number(),
+  event_type: z.string(),
+  summary: z.string(),
+  source: z.string(),
+  observed_at: z.string(),
 })
 const errorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string(), correlation_id: z.string() }),
@@ -104,6 +161,41 @@ export class ProductApi {
       body,
       employeeSchema,
     )
+  }
+
+  listWorks(workspaceId: string): Promise<WorkProjection[]> {
+    return this.request(
+      'GET',
+      `/workspaces/${encodeURIComponent(workspaceId)}/works`,
+      undefined,
+      z.array(workProjectionSchema),
+    )
+  }
+
+  createDirectWork(workspaceId: string, body: DirectWorkCreate): Promise<WorkProjection> {
+    return this.request(
+      'POST',
+      `/workspaces/${encodeURIComponent(workspaceId)}/works`,
+      body,
+      workProjectionSchema,
+    )
+  }
+
+  getWork(workId: string): Promise<WorkProjection> {
+    return this.request('GET', `/works/${encodeURIComponent(workId)}`, undefined, workProjectionSchema)
+  }
+
+  listWorkEvents(workId: string): Promise<CompanyEvent[]> {
+    return this.request(
+      'GET',
+      `/works/${encodeURIComponent(workId)}/events`,
+      undefined,
+      z.array(companyEventSchema),
+    )
+  }
+
+  cancelWork(workId: string): Promise<WorkProjection> {
+    return this.request('POST', `/works/${encodeURIComponent(workId)}/cancel`, undefined, workProjectionSchema)
   }
 
   private async request<T>(

@@ -28,6 +28,28 @@
   overflow: auto;
 }
 
+.content {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+}
+
+.tabs {
+  border-bottom: 1px solid #d7dee5;
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.tabs a { color: #174ea6; }
+.tabs a[aria-current='page'] { color: #17202a; font-weight: 600; }
+
+.workLayout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 20rem) 1fr;
+  min-width: 0;
+}
+
 .dialogForm {
   display: grid;
   gap: 1rem;
@@ -41,4 +63,5 @@
 
 @media (max-width: 42rem) {
   .layout { grid-template-columns: 1fr; }
+  .workLayout { grid-template-columns: 1fr; }
 }
