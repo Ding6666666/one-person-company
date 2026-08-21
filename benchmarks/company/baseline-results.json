@@ -1,0 +1,100 @@
+{
+  "task_set_version": "company-v1",
+  "dsh_revision": "2db6ebd58523d14dca278e366ea0eb40499702b9",
+  "company_commit": "4a2f37fc7dd4e4589d25a26a40e1cdf200e08ff7",
+  "model": "keyless-deterministic",
+  "measurement": {
+    "kind": "complete-system-keyless-fixture",
+    "runner": "dsh_company.evaluation.fixed_set:replay_fixed_task_set",
+    "runtime_concurrency": 1,
+    "token_accounting": "local endpoint usage",
+    "duration_unit": "wall_clock_ms",
+    "raw_content_retained": false
+  },
+  "runs": [
+    {
+      "task_id": "company-v1-direct-completion",
+      "strategy": "direct",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 8, "duration_ms": 1200, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-parallel-battle",
+      "strategy": "battle",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 24, "duration_ms": 2400, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-dependency-chain",
+      "strategy": "graph",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 16, "duration_ms": 2100, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-dependency-chain",
+      "strategy": "star",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 16, "duration_ms": 2200, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-approval-allow-reject",
+      "strategy": "direct",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 16, "duration_ms": 1700, "user_interventions": 2, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-approval-allow-reject",
+      "strategy": "graph",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 8, "duration_ms": 1800, "user_interventions": 2, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-restart-recovery",
+      "strategy": "direct",
+      "status": "blocked",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 8, "duration_ms": 2000, "user_interventions": 1, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "runtime_process_lost_retry_not_completed"}
+    },
+    {
+      "task_id": "company-v1-restart-recovery",
+      "strategy": "graph",
+      "status": "blocked",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 8, "duration_ms": 2200, "user_interventions": 1, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "runtime_process_lost_retry_not_completed"}
+    },
+    {
+      "task_id": "company-v1-session-isolation",
+      "strategy": "battle",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 24, "duration_ms": 1800, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-session-isolation",
+      "strategy": "graph",
+      "status": "completed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 16, "duration_ms": 1900, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "not_required"}
+    },
+    {
+      "task_id": "company-v1-endpoint-unavailable",
+      "strategy": "direct",
+      "status": "failed",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 0, "duration_ms": 300, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "endpoint_unavailable"}
+    },
+    {
+      "task_id": "company-v1-endpoint-unavailable",
+      "strategy": "star",
+      "status": "blocked",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 0, "duration_ms": 340, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "endpoint_unavailable"}
+    },
+    {
+      "task_id": "company-v1-endpoint-unavailable",
+      "strategy": "graph",
+      "status": "blocked",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 0, "duration_ms": 360, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "endpoint_unavailable"}
+    },
+    {
+      "task_id": "company-v1-endpoint-unavailable",
+      "strategy": "battle",
+      "status": "blocked",
+      "metrics": {"task_success": true, "milestone_rate": 1.0, "acceptance_rate": 1.0, "token_count": 0, "duration_ms": 420, "user_interventions": 0, "invalid_delegations": 0, "duplicate_nodes": 0, "policy_violations": 0, "policy_invariants_passed": true, "recovery_outcome": "endpoint_unavailable"}
+    }
+  ]
+}

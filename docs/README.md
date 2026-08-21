@@ -10,6 +10,7 @@
 4. [`multi-agent` 代码复用策略](development/multi-agent-reuse.md)：定义哪些代码迁移、哪些只参考、哪些保留为软件开发插件。
 5. [API 契约开发规则](development/contracts.md)：定义 schema 所有权、OpenAPI 快照、TypeScript 生成代码和兼容性审查要求。
 6. [DSH 公共能力矩阵](development/dsh-capability-matrix.md)：记录固定 DSH revision 的八项公开能力证据、限制和产品决策。
+7. [策略选择与固定基线](development/strategy-selection.md)：记录 Direct 默认规则、按任务族采用多员工策略的门槛和安全指标边界。
 
 ## 实施计划
 
@@ -37,6 +38,9 @@
   `failed/gateway_error`，不伪造成完成或自行实现 Memory/恢复框架。重启时发现的 RUNNING
   Attempt 记录为 `blocked/runtime_process_lost`。
 - 原 `multi-agent` 仓库保持独立、可构建和可验证。
+- Phase 5 已实现 DurableGraphEngine、Direct/Star/Graph/Battle、固定 `company-v1`
+  keyless 指标基线、MASEval 0.5.1 薄适配器和声明式业务插件边界。插件动作走同一
+  Company Policy/Approval 路径，但不会变成新的 DSH 工具。
 
 ## 文档权威顺序
 

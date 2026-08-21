@@ -2,11 +2,15 @@
 
 DSH Company is an independent open-source project built on DSH. The repository now contains the
 Phase 1 engineering foundation and public DSH capability evidence, the Phase 2 Company Core, the
-Phase 3 Direct Work loop, and Phase 4 governance:
+Phase 3 Direct Work loop, Phase 4 governance, and Phase 5 durable Work Graph and
+business-plugin boundaries:
 Workspace and Employee domain models, immutable Employee revisions, capability grants, stable DSH
 bindings, SQLite persistence, loopback APIs, direct execution/history/cancellation, and the
 management UI. Governance adds four-layer capability intersection, operator approvals, immutable
 delegation revisions, and bounded same-Workspace employee delegation.
+Phase 5 adds Direct, Star, explicit Graph, and Battle strategies on the same
+durable engine, a fixed keyless evaluation set, and declarative namespaced
+business plugins that use only public Company endpoints.
 
 ## Repository setup
 
@@ -41,7 +45,8 @@ uv run uvicorn dsh_company.asgi:app --host 127.0.0.1 --port 8000
 ```
 
 The service exposes `/health` together with Workspace, Employee, Work, event-history,
-cancellation, Workspace capability, approval, and delegation endpoints. When the
+cancellation, Workspace capability, approval, delegation, business-plugin, and
+template-instantiation endpoints. When the
 DSH Host starts it, Company data is stored in `company.db` beneath `DSH_COMPANY_DATA_ROOT` and is
 recovered after a service restart. Creating a Workspace or Employee is entirely local: it neither
 requires provider credentials nor starts DSH. Direct Work starts one Attempt-owned public DSH
@@ -75,6 +80,11 @@ bound to the same Session ID returns the SDK's closed error result before a seco
 Company records `failed/gateway_error`; it does not report completion or construct substitute
 Memory/resume behavior. A running Attempt found after service restart is instead recorded as
 `blocked/runtime_process_lost`.
+
+The fixed strategy baseline and adoption rule are documented in
+[strategy selection](docs/development/strategy-selection.md). Direct remains the
+global default; no aggregate benchmark score silently changes strategy. Baseline
+artifacts retain only safe system metrics and never model text or checksums.
 
 See [the documentation index](docs/README.md), [CONTRIBUTING.md](CONTRIBUTING.md) for contribution
 guidelines, and [SECURITY.md](SECURITY.md) for private vulnerability reporting. Licensed under the
