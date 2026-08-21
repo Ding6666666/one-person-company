@@ -1,9 +1,25 @@
+from dataclasses import dataclass
 from types import TracebackType
 from typing import Protocol, Self
 
 from dsh_company.domain.capabilities import CapabilityGrant
 from dsh_company.domain.employee import Employee, EmployeeAgentBinding, EmployeeRevision
-from dsh_company.domain.ids import EmployeeId, WorkspaceId
+from dsh_company.domain.ids import (
+    AttemptId,
+    EmployeeId,
+    EmployeeRevisionId,
+    WorkId,
+    WorkNodeId,
+    WorkspaceId,
+)
+from dsh_company.domain.work import (
+    ArtifactReference,
+    CompanyEvent,
+    ExecutionLink,
+    Work,
+    WorkGraphRevision,
+    WorkNode,
+)
 from dsh_company.domain.workspace import Workspace
 
 
@@ -57,6 +73,55 @@ class EmployeeRepository(Protocol):
     ) -> None: ...
 
 
+class WorkEmployeeRepository(EmployeeRepository, Protocol):
+    def get_revision(
+        self, employee_id: EmployeeId, revision_id: EmployeeRevisionId
+    ) -> EmployeeRecord | None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class WorkAggregate:
+    work: Work
+    graph: WorkGraphRevision
+    nodes: tuple[WorkNode, ...]
+    execution_links: tuple[ExecutionLink, ...]
+    artifacts: tuple[ArtifactReference, ...]
+
+
+class DuplicateCommand(Exception):
+    """A workspace already owns the supplied command ID."""
+
+
+class WorkRepository(Protocol):
+    def add(self, aggregate: WorkAggregate) -> None: ...
+
+    def get(self, work_id: WorkId) -> WorkAggregate | None: ...
+
+    def get_by_command(
+        self, workspace_id: WorkspaceId, command_id: str
+    ) -> WorkAggregate | None: ...
+
+    def get_for_node(self, node_id: WorkNodeId) -> WorkAggregate | None: ...
+
+    def get_for_attempt(self, attempt_id: AttemptId) -> WorkAggregate | None: ...
+
+    def list_dispatch_pending(self) -> tuple[WorkAggregate, ...]: ...
+
+    def list_running(self) -> tuple[WorkAggregate, ...]: ...
+
+    def update(self, aggregate: WorkAggregate) -> None: ...
+
+
+class CompanyEventRepository(Protocol):
+    def append(self, event: CompanyEvent) -> None: ...
+
+    def list_for_work(self, work_id: WorkId) -> tuple[CompanyEvent, ...]: ...
+
+
+class WorkDispatchQueue(Protocol):
+    def enqueue(self, node_id: WorkNodeId) -> None: ...
+
+
 class UnitOfWork(Protocol):
     @property
     def workspaces(self) -> WorkspaceRepository: ...
@@ -74,3 +139,18 @@ class UnitOfWork(Protocol):
     ) -> None: ...
 
     def commit(self) -> None: ...
+
+
+class WorkUnitOfWork(UnitOfWork, Protocol):
+    @property
+    def employees(self) -> WorkEmployeeRepository: ...
+
+    @property
+    def works(self) -> WorkRepository: ...
+
+    @property
+    def company_events(self) -> CompanyEventRepository: ...
+
+
+class UnitOfWorkFactory(Protocol):
+    def __call__(self) -> WorkUnitOfWork: ...

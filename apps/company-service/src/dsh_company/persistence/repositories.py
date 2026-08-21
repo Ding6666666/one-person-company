@@ -139,6 +139,19 @@ class EmployeeRepository:
             return None
         return self._record(employee_row)
 
+    def get_revision(
+        self, employee_id: EmployeeId, revision_id: EmployeeRevisionId
+    ) -> EmployeeRecord | None:
+        employee_row = self._session.get(EmployeeRow, employee_id)
+        revision_row = self._session.get(EmployeeRevisionRow, revision_id)
+        if (
+            employee_row is None
+            or revision_row is None
+            or revision_row.employee_id != employee_row.id
+        ):
+            return None
+        return self._record(employee_row, revision_row=revision_row)
+
     def list_for_workspace(self, workspace_id: WorkspaceId) -> tuple[EmployeeRecord, ...]:
         rows = self._session.scalars(
             select(EmployeeRow)
@@ -183,8 +196,13 @@ class EmployeeRepository:
         employee_row.current_revision_id = revision.id
         self._session.add_all([revision_row, *grant_rows])
 
-    def _record(self, employee_row: EmployeeRow) -> EmployeeRecord:
-        revision_row = self._session.get(
+    def _record(
+        self,
+        employee_row: EmployeeRow,
+        *,
+        revision_row: EmployeeRevisionRow | None = None,
+    ) -> EmployeeRecord:
+        revision_row = revision_row or self._session.get(
             EmployeeRevisionRow, employee_row.current_revision_id
         )
         binding_row = self._session.scalar(

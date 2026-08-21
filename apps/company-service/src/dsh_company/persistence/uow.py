@@ -1,4 +1,5 @@
 from types import TracebackType
+from typing import Self
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -18,7 +19,7 @@ class SqlAlchemyUnitOfWork:
         self._session: Session | None = None
         self._committed = False
 
-    def __enter__(self) -> "SqlAlchemyUnitOfWork":
+    def __enter__(self) -> Self:
         self._session = self._session_factory()
         self._committed = False
         self.workspaces = WorkspaceRepository(self._session)

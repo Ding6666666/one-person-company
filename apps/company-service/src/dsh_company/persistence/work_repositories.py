@@ -1,8 +1,8 @@
 import json
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
+from dsh_company.application.ports import DuplicateCommand, WorkAggregate
 from dsh_company.domain.ids import (
     ArtifactReferenceId,
     AttemptId,
@@ -42,21 +42,8 @@ from .work_models import (
 )
 
 
-class DuplicateCommand(Exception):
-    """A workspace already owns the supplied command ID."""
-
-
 class ConcurrentNodeUpdate(Exception):
     """A node was changed since the caller read its version."""
-
-
-@dataclass(frozen=True, slots=True)
-class WorkAggregate:
-    work: Work
-    graph: WorkGraphRevision
-    nodes: tuple[WorkNode, ...]
-    execution_links: tuple[ExecutionLink, ...]
-    artifacts: tuple[ArtifactReference, ...]
 
 
 def _from_sqlite_utc(value: datetime) -> datetime:
@@ -156,6 +143,23 @@ class WorkRepository:
                 WorkRow.workspace_id == workspace_id,
                 WorkRow.command_id == command_id,
             )
+        )
+        return None if row is None else self._aggregate(row)
+
+    def get_for_node(self, node_id: WorkNodeId) -> WorkAggregate | None:
+        row = self._session.scalar(
+            select(WorkRow)
+            .join(WorkNodeRow, WorkNodeRow.work_id == WorkRow.id)
+            .where(WorkNodeRow.id == node_id)
+        )
+        return None if row is None else self._aggregate(row)
+
+    def get_for_attempt(self, attempt_id: AttemptId) -> WorkAggregate | None:
+        row = self._session.scalar(
+            select(WorkRow)
+            .join(WorkNodeRow, WorkNodeRow.work_id == WorkRow.id)
+            .join(ExecutionLinkRow, ExecutionLinkRow.node_id == WorkNodeRow.id)
+            .where(ExecutionLinkRow.attempt_id == attempt_id)
         )
         return None if row is None else self._aggregate(row)
 
