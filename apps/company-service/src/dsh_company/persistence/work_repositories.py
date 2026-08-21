@@ -2,7 +2,11 @@ import json
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
-from dsh_company.application.ports import DuplicateCommand, WorkAggregate
+from dsh_company.application.ports import (
+    ConcurrentWorkUpdate,
+    DuplicateCommand,
+    WorkAggregate,
+)
 from dsh_company.domain.ids import (
     ArtifactReferenceId,
     AttemptId,
@@ -29,7 +33,7 @@ from dsh_company.domain.work import (
     WorkStatus,
     WorkStrategy,
 )
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -38,6 +42,7 @@ from .work_models import (
     ArtifactReferenceRow,
     CompanyEventRow,
     ExecutionLinkRow,
+    OrchestrationCapacityRow,
     WorkEdgeRow,
     WorkGraphNodeRow,
     WorkGraphRevisionRow,
@@ -277,13 +282,53 @@ class WorkRepository:
     def list_running(self) -> tuple[WorkAggregate, ...]:
         return self._list_for_execution_status(ExecutionStatus.RUNNING)
 
+    def count_active_execution_links(self) -> int:
+        return int(
+            self._session.scalar(
+                select(func.count(ExecutionLinkRow.id))
+                .where(
+                    ExecutionLinkRow.status.in_(
+                        (
+                            ExecutionStatus.DISPATCH_PENDING.value,
+                            ExecutionStatus.RUNNING.value,
+                            ExecutionStatus.CANCEL_REQUESTED.value,
+                        ),
+                    )
+                )
+            )
+            or 0
+        )
+
+    def lock_orchestration_capacity(self) -> None:
+        result = cast(
+            CursorResult[Any],
+            self._session.execute(
+                update(OrchestrationCapacityRow)
+                .where(OrchestrationCapacityRow.id == "runtime")
+                .values(revision=OrchestrationCapacityRow.revision + 1)
+            ),
+        )
+        if result.rowcount != 1:
+            raise RuntimeError("orchestration capacity row is not configured")
+
     def update(self, aggregate: WorkAggregate) -> None:
-        work_row = self._session.get(WorkRow, aggregate.work.id)
-        if work_row is None:
-            raise LookupError("work not found")
-        work_row.objective = aggregate.work.objective
-        work_row.status = aggregate.work.status.value
-        work_row.current_graph_revision_id = aggregate.work.current_graph_revision_id
+        work_result = cast(
+            CursorResult[Any],
+            self._session.execute(
+                update(WorkRow)
+                .where(
+                    WorkRow.id == aggregate.work.id,
+                    WorkRow.current_graph_revision_id == aggregate.graph.id,
+                )
+                .values(
+                    objective=aggregate.work.objective,
+                    status=aggregate.work.status.value,
+                    current_graph_revision_id=aggregate.work.current_graph_revision_id,
+                )
+            ),
+        )
+        if work_result.rowcount == 0:
+            raise ConcurrentWorkUpdate(str(aggregate.work.id))
 
         for node in aggregate.nodes:
             stored_node_row = self._session.get(WorkNodeRow, node.id)

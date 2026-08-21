@@ -24,3 +24,8 @@ def create_sqlite_engine(database_path: Path) -> Engine:
 
 def create_tables(engine: Engine) -> None:
     Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT OR IGNORE INTO orchestration_capacity (id, revision) "
+            "VALUES ('runtime', 0)"
+        )

@@ -223,11 +223,17 @@ def _service(
     *,
     deterministic_ids: bool = False,
 ) -> GovernanceService:
+    if deterministic_ids:
+        return GovernanceService(
+            cast(GovernanceUnitOfWork, uow),
+            PolicyEngine(),
+            dispatch,
+            ids=lambda prefix: f"{prefix}-1",
+        )
     return GovernanceService(
         cast(GovernanceUnitOfWork, uow),
         PolicyEngine(),
         dispatch,
-        **({"ids": lambda prefix: f"{prefix}-1"} if deterministic_ids else {}),
     )
 
 

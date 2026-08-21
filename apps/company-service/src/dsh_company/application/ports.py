@@ -12,6 +12,7 @@ from dsh_company.domain.ids import (
     DelegationId,
     EmployeeId,
     EmployeeRevisionId,
+    WorkGraphRevisionId,
     WorkId,
     WorkNodeId,
     WorkspaceId,
@@ -96,6 +97,10 @@ class DuplicateCommand(Exception):
     """A workspace already owns the supplied command ID."""
 
 
+class ConcurrentWorkUpdate(Exception):
+    """The Work current graph changed since the aggregate was loaded."""
+
+
 class WorkRepository(Protocol):
     def add(self, aggregate: WorkAggregate) -> None: ...
 
@@ -109,6 +114,10 @@ class WorkRepository(Protocol):
 
     def get_for_attempt(self, attempt_id: AttemptId) -> WorkAggregate | None: ...
 
+    def get_revision(
+        self, revision_id: WorkGraphRevisionId
+    ) -> tuple[WorkGraphRevision, tuple[WorkNode, ...]] | None: ...
+
     def add_revision(
         self, graph: WorkGraphRevision, nodes: tuple[WorkNode, ...]
     ) -> None: ...
@@ -120,6 +129,10 @@ class WorkRepository(Protocol):
     def list_dispatch_pending(self) -> tuple[WorkAggregate, ...]: ...
 
     def list_running(self) -> tuple[WorkAggregate, ...]: ...
+
+    def count_active_execution_links(self) -> int: ...
+
+    def lock_orchestration_capacity(self) -> None: ...
 
     def update(self, aggregate: WorkAggregate) -> None: ...
 
@@ -180,6 +193,10 @@ class WorkDispatchQueue(Protocol):
 
 class WorkCoordinator(WorkDispatchQueue, Protocol):
     def request_cancel(self, node_id: WorkNodeId) -> None: ...
+
+
+class WorkReconciler(Protocol):
+    def reconcile(self, work_id: WorkId) -> None: ...
 
 
 class UnitOfWork(Protocol):

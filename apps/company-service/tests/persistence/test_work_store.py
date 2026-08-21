@@ -29,12 +29,16 @@ from dsh_company.domain.work import (
     ExecutionLink,
     ExecutionStatus,
     Work,
+    WorkGraphRevision,
+    WorkStatus,
+    WorkStrategy,
 )
 from dsh_company.domain.workspace import Workspace
 from dsh_company.persistence.database import create_sqlite_engine, create_tables
 from dsh_company.persistence.uow import SqlAlchemyUnitOfWork
 from dsh_company.persistence.work_repositories import (
     ConcurrentNodeUpdate,
+    ConcurrentWorkUpdate,
     DuplicateCommand,
     WorkAggregate,
 )
@@ -200,6 +204,45 @@ def test_completed_node_output_reference_survives_update_and_reload(
     assert stored == completed
     assert stored is not None
     assert stored.nodes[0].output_references == (artifact_id,)
+
+
+def test_stale_graph_update_cannot_restore_old_current_revision(
+    sqlite_engine: Engine,
+) -> None:
+    with SqlAlchemyUnitOfWork(sqlite_engine) as uow:
+        revision_id = _seed_company(uow)
+        aggregate = _aggregate(employee_revision_id=revision_id)
+        uow.works.add(aggregate)
+        uow.commit()
+
+    stale_uow = SqlAlchemyUnitOfWork(sqlite_engine)
+    with stale_uow as first:
+        stale = first.works.get(WorkId("work-1"))
+        assert stale is not None
+        with SqlAlchemyUnitOfWork(sqlite_engine) as second:
+            graph2 = WorkGraphRevision(
+                id=WorkGraphRevisionId("graph-2"),
+                work_id=stale.work.id,
+                revision_number=2,
+                strategy=WorkStrategy.DIRECT,
+                created_at=datetime.now(UTC),
+                node_ids=stale.graph.node_ids,
+                edges=stale.graph.edges,
+            )
+            second.works.add_revision(graph2, stale.nodes)
+            second.commit()
+
+        with pytest.raises(ConcurrentWorkUpdate):
+            first.works.update(
+                replace(stale, work=replace(stale.work, status=WorkStatus.BLOCKED))
+            )
+            first.commit()
+
+    with SqlAlchemyUnitOfWork(sqlite_engine) as uow:
+        current = uow.works.get(WorkId("work-1"))
+    assert current is not None
+    assert current.work.current_graph_revision_id == WorkGraphRevisionId("graph-2")
+    assert current.work.status is WorkStatus.QUEUED
 
 
 def test_reloaded_direct_graph_can_be_delegated_without_rewriting_node_facts(
@@ -637,3 +680,43 @@ def test_node_graph_fields_migration_backfills_and_round_trips(
     assert "required_actions_json" not in columns
 
     command.upgrade(config, "head")
+
+
+def test_orchestration_capacity_migration_round_trip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "orchestration-capacity.db"
+    monkeypatch.setenv(
+        "DSH_COMPANY_DATABASE_URL", f"sqlite:///{database_path.as_posix()}"
+    )
+    config = Config("apps/company-service/alembic.ini")
+
+    command.upgrade(config, "head")
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT id, revision FROM orchestration_capacity"
+        ).one()
+    engine.dispose()
+    assert row == ("runtime", 0)
+
+    command.downgrade(config, "0005_node_graph_fields")
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        tables = {
+            row[0]
+            for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+    engine.dispose()
+    assert "orchestration_capacity" not in tables
+
+    command.upgrade(config, "head")
+    engine = create_sqlite_engine(database_path)
+    with engine.connect() as connection:
+        row = connection.exec_driver_sql(
+            "SELECT id, revision FROM orchestration_capacity"
+        ).one()
+    engine.dispose()
+    assert row == ("runtime", 0)

@@ -9,6 +9,7 @@ from dsh_company.domain.ids import (
     ArtifactReferenceId,
     AttemptId,
     CompanyEventId,
+    WorkId,
     WorkNodeId,
     new_id,
 )
@@ -20,6 +21,7 @@ from dsh_company.domain.work import (
     WorkNode,
     WorkNodeStatus,
     WorkStatus,
+    project_graph_work_status,
 )
 from dsh_company.dsh_gateway.contracts import (
     DshGateway,
@@ -54,6 +56,10 @@ class RuntimeGovernancePort(Protocol):
     ) -> tuple[WorkNodeId, ...]: ...
 
 
+class RuntimeTerminalObserver(Protocol):
+    def reconcile(self, work_id: WorkId) -> None: ...
+
+
 class RuntimeCoordinator:
     def __init__(
         self,
@@ -61,6 +67,7 @@ class RuntimeCoordinator:
         gateway: DshGateway,
         *,
         governance_handler: RuntimeGovernancePort | None = None,
+        terminal_observer: RuntimeTerminalObserver | None = None,
         id_factory: IdFactory = new_id,
         runtime_concurrency: int = 4,
     ) -> None:
@@ -69,6 +76,7 @@ class RuntimeCoordinator:
         self._uow_factory = uow_factory
         self._gateway = gateway
         self._governance_handler = governance_handler
+        self._terminal_observer = terminal_observer
         self._id_factory = id_factory
         self._executor = ThreadPoolExecutor(
             max_workers=runtime_concurrency,
@@ -117,6 +125,7 @@ class RuntimeCoordinator:
                     submission.attempt_id,
                     source_sequence=highest_event_sequence + 1,
                 )
+            self._notify_terminal(aggregate.work.id)
             return
 
         enqueue_node_ids: tuple[WorkNodeId, ...] = ()
@@ -148,6 +157,7 @@ class RuntimeCoordinator:
                 )
         for queued_node_id in enqueue_node_ids:
             self.enqueue(queued_node_id)
+        self._notify_terminal(aggregate.work.id)
 
     def request_cancel(self, node_id: WorkNodeId) -> None:
         node_lock = self._node_lock(node_id)
@@ -199,7 +209,6 @@ class RuntimeCoordinator:
                         return
                     updated = replace(
                         aggregate,
-                        work=aggregate.work.block_before_start(),
                         nodes=self._replace_node(
                             aggregate,
                             node.block_before_start("cancel_unconfirmed"),
@@ -209,8 +218,10 @@ class RuntimeCoordinator:
                             link.block(attempt_id, "cancel_unconfirmed"),
                         ),
                     )
+                    updated = self._with_projected_work(updated)
                     uow.works.update(updated)
                     uow.commit()
+                self._notify_terminal(updated.work.id)
                 return
 
         try:
@@ -230,7 +241,6 @@ class RuntimeCoordinator:
                 if runtime_closed:
                     updated = replace(
                         aggregate,
-                        work=aggregate.work.cancel(),
                         nodes=self._replace_node(
                             aggregate, node.cancel(attempt_id)
                         ),
@@ -241,7 +251,6 @@ class RuntimeCoordinator:
                 else:
                     updated = replace(
                         aggregate,
-                        work=aggregate.work.block(),
                         nodes=self._replace_node(
                             aggregate,
                             node.block(attempt_id, "cancel_unconfirmed"),
@@ -251,8 +260,10 @@ class RuntimeCoordinator:
                             link.block(attempt_id, "cancel_unconfirmed"),
                         ),
                     )
+                updated = self._with_projected_work(updated)
                 uow.works.update(updated)
                 uow.commit()
+        self._notify_terminal(updated.work.id)
 
     def start(self) -> None:
         with self._lifecycle_lock:
@@ -401,22 +412,16 @@ class RuntimeCoordinator:
             )
             completed_node = node.complete(attempt_id, artifact_id)
             completed_nodes = self._replace_node(aggregate, completed_node)
-            work_completed = all(
-                item.status is WorkNodeStatus.COMPLETED for item in completed_nodes
-            )
             completed = replace(
                 aggregate,
-                work=(
-                    aggregate.work.complete()
-                    if work_completed
-                    else aggregate.work
-                ),
                 nodes=completed_nodes,
                 execution_links=self._replace_link(
                     aggregate, link.complete(attempt_id, artifact_id)
                 ),
                 artifacts=(*aggregate.artifacts, artifact),
             )
+            completed = self._with_projected_work(completed)
+            work_completed = completed.work.status is WorkStatus.COMPLETED
             uow.works.update(completed)
             uow.company_events.append(
                 self._terminal_event(
@@ -512,16 +517,26 @@ class RuntimeCoordinator:
             link = self._link_for_attempt(aggregate, node_id, attempt_id)
             if link.status is not ExecutionStatus.RUNNING:
                 return
+            used_attempts = max(
+                node.attempt_count,
+                sum(item.node_id == node_id for item in aggregate.execution_links),
+            )
+            retryable = used_attempts < node.max_attempts
             failed = replace(
                 aggregate,
-                work=aggregate.work.fail(),
                 nodes=self._replace_node(
-                    aggregate, node.fail(attempt_id, "gateway_error")
+                    aggregate,
+                    (
+                        node.block(attempt_id, "gateway_error")
+                        if retryable
+                        else node.fail(attempt_id, "gateway_error")
+                    ),
                 ),
                 execution_links=self._replace_link(
                     aggregate, link.fail(attempt_id, "gateway_error")
                 ),
             )
+            failed = self._with_projected_work(failed)
             uow.works.update(failed)
             uow.company_events.append(
                 self._terminal_event(
@@ -529,11 +544,23 @@ class RuntimeCoordinator:
                     attempt_id,
                     source_sequence,
                     node_id=node_id,
-                    event_type="work.failed",
-                    summary="Work failed",
+                    event_type=(
+                        "node.attempt_failed" if retryable else "work.failed"
+                    ),
+                    summary=(
+                        "Node attempt failed" if retryable else "Work failed"
+                    ),
                 )
             )
             uow.commit()
+
+    def _notify_terminal(self, work_id: WorkId) -> None:
+        if self._terminal_observer is None:
+            return
+        try:
+            self._terminal_observer.reconcile(work_id)
+        except Exception:
+            _LOGGER.exception("Company graph terminal reconciliation failed")
 
     def _block_runtime_process_lost(self, node_id: WorkNodeId) -> None:
         with self._node_lock(node_id):
@@ -545,7 +572,6 @@ class RuntimeCoordinator:
                     return
                 blocked = replace(
                     aggregate,
-                    work=aggregate.work.block(),
                     nodes=self._replace_node(
                         aggregate,
                         node.block(link.attempt_id, "runtime_process_lost"),
@@ -555,8 +581,19 @@ class RuntimeCoordinator:
                         link.block(link.attempt_id, "runtime_process_lost"),
                     ),
                 )
+                blocked = self._with_projected_work(blocked)
                 uow.works.update(blocked)
                 uow.commit()
+
+    @staticmethod
+    def _with_projected_work(aggregate: WorkAggregate) -> WorkAggregate:
+        return replace(
+            aggregate,
+            work=replace(
+                aggregate.work,
+                status=project_graph_work_status(aggregate.graph, aggregate.nodes),
+            ),
+        )
 
     def _terminal_event(
         self,

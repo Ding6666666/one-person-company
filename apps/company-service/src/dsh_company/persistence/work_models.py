@@ -22,6 +22,13 @@ class WorkRow(Base):
     events: Mapped[list["CompanyEventRow"]] = relationship(back_populates="work")
 
 
+class OrchestrationCapacityRow(Base):
+    __tablename__ = "orchestration_capacity"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class WorkGraphRevisionRow(Base):
     __tablename__ = "work_graph_revisions"
     __table_args__ = (UniqueConstraint("work_id", "revision_number"),)

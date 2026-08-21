@@ -11,10 +11,19 @@ from dsh_company.application.governance_service import GovernanceService
 from dsh_company.application.ports import WorkCoordinator, WorkUnitOfWork
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
 from dsh_company.application.runtime_governance import RuntimeGovernanceHandler
-from dsh_company.domain.ids import WorkNodeId
+from dsh_company.domain.ids import (
+    ArtifactReferenceId,
+    AttemptId,
+    WorkGraphRevisionId,
+    WorkId,
+    WorkNodeId,
+)
 from dsh_company.domain.policy import PolicyEngine
+from dsh_company.domain.work import ExecutionLink
 from dsh_company.dsh_gateway.adapter import PublicSdkDshGateway
 from dsh_company.foundation.config import Settings
+from dsh_company.orchestration.contracts import OrchestrationEngine
+from dsh_company.orchestration.durable_graph import DurableGraphEngine
 from dsh_company.persistence.database import create_sqlite_engine, create_tables
 from dsh_company.persistence.uow import SqlAlchemyUnitOfWork
 
@@ -45,6 +54,48 @@ class _UnconfiguredWorkCoordinator:
         raise RuntimeError("work coordinator is not configured")
 
 
+class _UnconfiguredOrchestrationEngine:
+    def start(self, graph_revision_id: WorkGraphRevisionId) -> None:
+        del graph_revision_id
+        raise RuntimeError("orchestration engine is not configured")
+
+    def dispatch_ready_nodes(self, work_id: WorkId) -> tuple[ExecutionLink, ...]:
+        del work_id
+        raise RuntimeError("orchestration engine is not configured")
+
+    def record_completion(
+        self,
+        node_id: WorkNodeId,
+        attempt_id: AttemptId,
+        result_reference: ArtifactReferenceId,
+    ) -> None:
+        del node_id, attempt_id, result_reference
+        raise RuntimeError("orchestration engine is not configured")
+
+    def record_failure(
+        self, node_id: WorkNodeId, attempt_id: AttemptId, reason: str
+    ) -> None:
+        del node_id, attempt_id, reason
+        raise RuntimeError("orchestration engine is not configured")
+
+    def request_cancel(self, node_id: WorkNodeId) -> None:
+        del node_id
+        raise RuntimeError("orchestration engine is not configured")
+
+    def reconcile(self, work_id: WorkId) -> None:
+        del work_id
+        raise RuntimeError("orchestration engine is not configured")
+
+
+class _TerminalObserverProxy:
+    def __init__(self) -> None:
+        self.target: OrchestrationEngine | None = None
+
+    def reconcile(self, work_id: WorkId) -> None:
+        if self.target is not None:
+            self.target.reconcile(work_id)
+
+
 def _company_router() -> APIRouter:
     router = APIRouter()
     router.include_router(company_router)
@@ -57,6 +108,9 @@ def _company_router() -> APIRouter:
 class ComponentAssembly:
     uow_factory: Callable[[], WorkUnitOfWork] = _unconfigured_uow
     work_coordinator: WorkCoordinator = field(default_factory=_UnconfiguredWorkCoordinator)
+    orchestration_engine: OrchestrationEngine = field(
+        default_factory=_UnconfiguredOrchestrationEngine
+    )
     governance_service_factory: Callable[[], GovernanceService] = _unconfigured_governance_service
     delegation_service_factory: Callable[[], DelegationService] = _unconfigured_delegation_service
     router: APIRouter = field(default_factory=_company_router)
@@ -94,15 +148,28 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
             uow_factory,
             PolicyEngine(),
         )
+        terminal_observer = _TerminalObserverProxy()
         coordinator = RuntimeCoordinator(
             uow_factory,
             gateway,
             governance_handler=governance_handler,
+            terminal_observer=terminal_observer,
             runtime_concurrency=settings.runtime_concurrency,
         )
+        orchestration_engine = DurableGraphEngine(
+            uow_factory,
+            coordinator,
+            runtime_concurrency=settings.runtime_concurrency,
+        )
+        terminal_observer.target = orchestration_engine
 
         def governance_service_factory() -> GovernanceService:
-            return GovernanceService(uow_factory(), PolicyEngine(), coordinator)
+            return GovernanceService(
+                uow_factory(),
+                PolicyEngine(),
+                coordinator,
+                terminal_observer=terminal_observer,
+            )
 
         def delegation_service_factory() -> DelegationService:
             return DelegationService(uow_factory(), PolicyEngine(), coordinator)
@@ -119,6 +186,7 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
     return ComponentAssembly(
         uow_factory=uow_factory,
         work_coordinator=coordinator,
+        orchestration_engine=orchestration_engine,
         governance_service_factory=governance_service_factory,
         delegation_service_factory=delegation_service_factory,
         startup=coordinator.start,

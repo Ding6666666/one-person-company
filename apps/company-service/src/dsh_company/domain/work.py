@@ -117,6 +117,63 @@ class WorkGraphRevision:
             visit(node_id)
 
 
+def project_graph_work_status(
+    graph: WorkGraphRevision, nodes: tuple["WorkNode", ...]
+) -> WorkStatus:
+    """Project Work from current graph outcomes.
+
+    Structural sinks decide terminal status, so a completed summary can close Work
+    while retaining failed upstream facts. Delegated children support their source;
+    the source remains the outcome until it resumes and finishes.
+    """
+    by_id = {node.id: node for node in nodes}
+    current_nodes = tuple(by_id[node_id] for node_id in graph.node_ids)
+    if any(node.status is WorkNodeStatus.RUNNING for node in current_nodes):
+        return WorkStatus.RUNNING
+
+    source_ids = {edge.from_node_id for edge in graph.edges}
+    delegation_sources = {
+        edge.from_node_id
+        for edge in graph.edges
+        if edge.kind is WorkEdgeKind.DELEGATES_TO
+    }
+    delegation_targets = {
+        edge.to_node_id
+        for edge in graph.edges
+        if edge.kind is WorkEdgeKind.DELEGATES_TO
+    }
+    sinks = tuple(
+        node
+        for node in current_nodes
+        if (node.id not in source_ids and node.id not in delegation_targets)
+        or node.id in delegation_sources
+    )
+    sink_statuses = {node.status for node in sinks}
+    if sink_statuses and sink_statuses == {WorkNodeStatus.COMPLETED}:
+        return WorkStatus.COMPLETED
+    if sink_statuses.intersection(
+        {
+            WorkNodeStatus.DRAFT,
+            WorkNodeStatus.READY,
+            WorkNodeStatus.WAITING_APPROVAL,
+        }
+    ):
+        return WorkStatus.QUEUED
+    if any(
+        node.status is WorkNodeStatus.BLOCKED
+        and node.failure_code == "waiting_delegation"
+        for node in sinks
+    ):
+        return WorkStatus.RUNNING
+    if WorkNodeStatus.BLOCKED in sink_statuses:
+        return WorkStatus.BLOCKED
+    if WorkNodeStatus.FAILED in sink_statuses:
+        return WorkStatus.FAILED
+    if WorkNodeStatus.CANCELLED in sink_statuses:
+        return WorkStatus.CANCELLED
+    return WorkStatus.QUEUED
+
+
 @dataclass(frozen=True, slots=True)
 class WorkNode:
     id: WorkNodeId

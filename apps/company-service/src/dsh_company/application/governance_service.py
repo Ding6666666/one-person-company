@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
@@ -23,7 +24,7 @@ from dsh_company.domain.work import (
     ExecutionStatus,
     WorkNode,
     WorkNodeStatus,
-    WorkStatus,
+    project_graph_work_status,
 )
 from dsh_company.policy.runtime_profiles import actions_for_runtime_profile
 
@@ -32,7 +33,10 @@ from .ports import (
     IdFactory,
     WorkAggregate,
     WorkDispatchQueue,
+    WorkReconciler,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,11 +73,13 @@ class GovernanceService:
         policy_engine: PolicyEngine,
         dispatch_queue: WorkDispatchQueue | None = None,
         *,
+        terminal_observer: WorkReconciler | None = None,
         ids: IdFactory = new_id,
     ) -> None:
         self._uow = uow
         self._policy_engine = policy_engine
         self._dispatch_queue = dispatch_queue
+        self._terminal_observer = terminal_observer
         self._ids = ids
 
     def authorize(self, command: GovernedAction) -> AuthorizationResult:
@@ -81,7 +87,7 @@ class GovernanceService:
         with self._uow as uow:
             aggregate = self._require_aggregate(uow.works.get_for_node(command.node_id))
             node = self._require_single_node(aggregate, command.node_id)
-            self._require_execution_link(aggregate, command.node_id)
+            self._require_execution_link(aggregate, node)
             if node.status is not WorkNodeStatus.READY:
                 raise ValueError("governed action requires a ready work node")
             decision = self._decide(uow, aggregate, command)
@@ -121,6 +127,7 @@ class GovernanceService:
         return approved
 
     def reject(self, approval_id: ApprovalId, *, decided_by: str) -> Approval:
+        work_id = None
         with self._uow as uow:
             approval = self._require_approval(uow.approvals.get(approval_id), approval_id)
             rejected = approval.reject(decided_by=decided_by.strip())
@@ -128,10 +135,9 @@ class GovernanceService:
                 uow.works.get_for_node(approval.node_id)
             )
             node = self._require_single_node(aggregate, approval.node_id)
-            link = self._require_execution_link(aggregate, approval.node_id)
+            link = self._require_execution_link(aggregate, node)
             failed = replace(
                 self._with_node(aggregate, node.approval_rejected()),
-                work=replace(aggregate.work, status=WorkStatus.FAILED),
             )
             failed = self._with_link(
                 failed,
@@ -140,6 +146,13 @@ class GovernanceService:
                     status=ExecutionStatus.BLOCKED,
                     finished_at=datetime.now(UTC),
                     diagnostic_code="approval_rejected",
+                ),
+            )
+            failed = replace(
+                failed,
+                work=replace(
+                    failed.work,
+                    status=project_graph_work_status(failed.graph, failed.nodes),
                 ),
             )
             uow.approvals.decide(rejected)
@@ -159,6 +172,12 @@ class GovernanceService:
                 )
             )
             uow.commit()
+            work_id = failed.work.id
+        if work_id is not None and self._terminal_observer is not None:
+            try:
+                self._terminal_observer.reconcile(work_id)
+            except Exception:
+                _LOGGER.exception("Company graph approval rejection reconciliation failed")
         return rejected
 
     def resume_approved(self, approval_id: ApprovalId) -> PolicyDecision:
@@ -170,7 +189,7 @@ class GovernanceService:
                 uow.works.get_for_node(approval.node_id)
             )
             node = self._require_single_node(aggregate, approval.node_id)
-            self._require_execution_link(aggregate, approval.node_id)
+            self._require_execution_link(aggregate, node)
             if node.status is not WorkNodeStatus.WAITING_APPROVAL:
                 raise ValueError("approved action is not waiting for approval")
             command = GovernedAction(
@@ -273,7 +292,7 @@ class GovernanceService:
         cls, aggregate: WorkAggregate, node_id: WorkNodeId, reason: str
     ) -> WorkAggregate:
         node = cls._require_single_node(aggregate, node_id)
-        link = cls._require_execution_link(aggregate, node_id)
+        link = cls._require_execution_link(aggregate, node)
         if node.status is not WorkNodeStatus.READY:
             raise ValueError("only a ready node can be blocked before dispatch")
         if link.status is not ExecutionStatus.DISPATCH_PENDING:
@@ -309,13 +328,26 @@ class GovernanceService:
 
     @staticmethod
     def _require_execution_link(
-        aggregate: WorkAggregate, node_id: WorkNodeId
+        aggregate: WorkAggregate, node: WorkNode
     ) -> ExecutionLink:
         matching = tuple(
-            link for link in aggregate.execution_links if link.node_id == node_id
+            link
+            for link in aggregate.execution_links
+            if link.node_id == node.id
+            and (
+                link.attempt_id == node.active_attempt_id
+                if node.active_attempt_id is not None
+                else link.status
+                in {
+                    ExecutionStatus.DISPATCH_PENDING,
+                    ExecutionStatus.CANCEL_REQUESTED,
+                }
+            )
         )
         if len(matching) != 1:
-            raise ValueError("governed node requires exactly one execution link")
+            raise ValueError(
+                "governed node requires exactly one execution link for current attempt"
+            )
         return matching[0]
 
     @staticmethod
