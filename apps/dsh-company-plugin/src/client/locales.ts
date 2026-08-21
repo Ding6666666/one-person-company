@@ -76,6 +76,19 @@ export const zh = {
   delegate: '委派', delegationInvalid: '请完整填写委派信息', delegationDenied: '委派被拒绝', delegationAccepted: '已接受', delegationRejected: '已拒绝', delegationCompleted: '已完成', delegationProposed: '已提议',
   delegationFieldsInvalid: '请修正委派字段', delegationSubmitFailed: '委派提交失败',
   delegationSource: '委派来源', selectDelegationSource: '请选择运行中的节点', noRunningDelegationSource: '没有运行中的委派来源',
+  strategy: '策略', strategyFieldsInvalid: '请完整填写当前策略配置',
+  battleParticipants: 'Battle 参与员工（2–4 名）', summarizer: '汇总员工',
+  starConfiguration: 'Star 配置', coordinator: '协调员工', childEmployee: '子任务员工', childObjective: '子任务目标', addChild: '添加子任务',
+  graphConfiguration: 'Graph 配置', nodeKey: '节点标识', nodeObjective: '节点目标', addNode: '添加节点', addDependency: '添加依赖', dependencyFrom: '起点', dependencyKind: '关系', dependencyTo: '终点',
+  workGraph: '工作图', assignedEmployee: '负责员工', nodeStatus: '节点状态', attempts: '尝试次数', dependencies: '依赖关系',
+  nodeStatusDraft: '草稿', nodeStatusReady: '就绪', nodeStatusWaitingApproval: '等待审批', approvalWaiting: '审批：等待处理',
+  edgeDependsOn: '依赖', edgeDelegatesTo: '委派给', edgeReviews: '审核', edgeSummarizes: '汇总至',
+  battleResult: 'Battle 结果', battleExplanation: '参与员工并行工作，汇总员工整理共同点并明确列出分歧。',
+  workObjectiveTooLong: '工作目标不能超过 4000 个字符', criteriaTooMany: '验收标准不能超过 50 条', criterionTooLong: '每条验收标准不能超过 500 个字符',
+  battleParticipantCount: '请选择 2–4 名参与员工', battleParticipantsDistinct: '参与员工不能重复', battleSummarizerRequired: '请选择一名在职汇总员工', battleSummarizerDistinct: '汇总员工不能同时作为参与员工',
+  starChildrenRequired: '请至少添加一个子任务', starChildrenTooMany: '子任务不能超过 16 个', childObjectiveRequired: '请输入子任务目标', childObjectiveTooLong: '子任务目标不能超过 4000 个字符',
+  graphNodesRequired: '请至少添加一个节点', graphNodesTooMany: '节点不能超过 32 个', nodeKeyRequired: '请输入节点标识', nodeKeyTooLong: '节点标识不能超过 120 个字符', nodeKeyDuplicate: '节点标识不能重复', nodeObjectiveRequired: '请输入节点目标', nodeObjectiveTooLong: '节点目标不能超过 4000 个字符',
+  graphEdgesTooMany: '依赖不能超过 128 条', edgeEndpointUnknown: '依赖端点必须引用现有节点', edgeSelfReference: '节点不能依赖自身', edgeDuplicate: '依赖不能重复', graphCycle: '工作图不能包含环',
 } as const
 
 export const en: Record<keyof typeof zh, string> = {
@@ -154,6 +167,19 @@ export const en: Record<keyof typeof zh, string> = {
   delegate: 'Delegate', delegationInvalid: 'Complete every delegation field', delegationDenied: 'Delegation denied', delegationAccepted: 'Accepted', delegationRejected: 'Rejected', delegationCompleted: 'Completed', delegationProposed: 'Proposed',
   delegationFieldsInvalid: 'Fix the delegation fields', delegationSubmitFailed: 'Could not submit delegation',
   delegationSource: 'Delegation source', selectDelegationSource: 'Select a running node', noRunningDelegationSource: 'No running delegation source',
+  strategy: 'Strategy', strategyFieldsInvalid: 'Complete the selected strategy configuration',
+  battleParticipants: 'Battle participants (2–4)', summarizer: 'Summarizer',
+  starConfiguration: 'Star configuration', coordinator: 'Coordinator', childEmployee: 'Child employee', childObjective: 'Child objective', addChild: 'Add child',
+  graphConfiguration: 'Graph configuration', nodeKey: 'Node key', nodeObjective: 'Node objective', addNode: 'Add node', addDependency: 'Add dependency', dependencyFrom: 'From', dependencyKind: 'Relationship', dependencyTo: 'To',
+  workGraph: 'Work graph', assignedEmployee: 'Assigned employee', nodeStatus: 'Node status', attempts: 'Attempts', dependencies: 'Dependencies',
+  nodeStatusDraft: 'Draft', nodeStatusReady: 'Ready', nodeStatusWaitingApproval: 'Waiting for approval', approvalWaiting: 'Approval: waiting',
+  edgeDependsOn: 'depends on', edgeDelegatesTo: 'delegates to', edgeReviews: 'reviews', edgeSummarizes: 'summarizes',
+  battleResult: 'Battle result', battleExplanation: 'Participants work in parallel; the summarizer consolidates common points and lists differences.',
+  workObjectiveTooLong: 'Work objective must be at most 4000 characters', criteriaTooMany: 'Acceptance criteria must contain at most 50 items', criterionTooLong: 'Each acceptance criterion must be at most 500 characters',
+  battleParticipantCount: 'Select 2–4 participants', battleParticipantsDistinct: 'Participants must be distinct', battleSummarizerRequired: 'Select one active summarizer', battleSummarizerDistinct: 'Summarizer must be distinct from participants',
+  starChildrenRequired: 'Add at least one child', starChildrenTooMany: 'Star can contain at most 16 children', childObjectiveRequired: 'Enter a child objective', childObjectiveTooLong: 'Child objective must be at most 4000 characters',
+  graphNodesRequired: 'Add at least one node', graphNodesTooMany: 'Graph can contain at most 32 nodes', nodeKeyRequired: 'Enter a node key', nodeKeyTooLong: 'Node key must be at most 120 characters', nodeKeyDuplicate: 'Node keys must be unique', nodeObjectiveRequired: 'Enter a node objective', nodeObjectiveTooLong: 'Node objective must be at most 4000 characters',
+  graphEdgesTooMany: 'Graph can contain at most 128 edges', edgeEndpointUnknown: 'Edge endpoints must reference existing nodes', edgeSelfReference: 'A node cannot depend on itself', edgeDuplicate: 'Edges must be unique', graphCycle: 'Work graph must be acyclic',
 }
 
 export type CompanyLocaleKey = keyof typeof zh

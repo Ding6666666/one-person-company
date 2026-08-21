@@ -11,7 +11,7 @@ import { EmployeeForm } from './EmployeeForm.js'
 import { NS, type CompanyLocale, translate, type Translate } from './locales.js'
 import styles from './CompanySurface.module.css'
 import { Button, Dialog, Field } from './ui/Primitives.js'
-import { WorkComposer } from './WorkComposer.js'
+import { StrategyComposer } from './StrategyComposer.js'
 import { WorkDetail } from './WorkDetail.js'
 import { WorkList } from './WorkList.js'
 import { WorkspaceList } from './WorkspaceList.js'
@@ -156,6 +156,7 @@ export function CompanySurface({
               workspaceId: snapshot.selectedWork.workspace_id,
               onWorkUpdated: work => controller.applyAuthoritativeWork(work),
             }}
+            employees={snapshot.employees}
             t={t}
           />}
         </div>}
@@ -185,12 +186,12 @@ export function CompanySurface({
       />
     </Dialog>}
     {workDialog && snapshot.selectedWorkspaceId !== undefined && <Dialog title={t('createWork')} onClose={closeWorkDialog}>
-      <WorkComposer
+      <StrategyComposer
         employees={snapshot.employees}
         pending={snapshot.pending}
         onCancel={closeWorkDialog}
         onStart={async input => {
-          const created = await controller.createDirectWork(input)
+          const created = await controller.createStrategyWork(input)
           if (created !== undefined) closeWorkDialog()
         }}
         t={t}

@@ -256,8 +256,8 @@ export interface paths {
         /** List Workspace Works */
         get: operations["list_workspace_works_workspaces__workspace_id__works_get"];
         put?: never;
-        /** Create Direct Work */
-        post: operations["create_direct_work_workspaces__workspace_id__works_post"];
+        /** Create Work */
+        post: operations["create_work_workspaces__workspace_id__works_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -326,6 +326,24 @@ export interface components {
             kind: "dsh_session_result";
             /** Uri */
             uri: string;
+        };
+        /** BattleStrategyInput */
+        BattleStrategyInput: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Command Id */
+            command_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "battle";
+            /** Objective */
+            objective: string;
+            /** Participant Employee Ids */
+            participant_employee_ids: string[];
+            /** Summarizer Employee Id */
+            summarizer_employee_id: string;
         };
         /** CompanyEvent */
         CompanyEvent: {
@@ -410,6 +428,22 @@ export interface components {
         DelegationResultProjection: {
             delegation: components["schemas"]["DelegationProjection"];
             work: components["schemas"]["WorkProjection"];
+        };
+        /** DirectStrategyInput */
+        DirectStrategyInput: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Command Id */
+            command_id: string;
+            /** Employee Id */
+            employee_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "direct";
+            /** Objective */
+            objective: string;
         };
         /** DirectWorkCreate */
         DirectWorkCreate: {
@@ -592,6 +626,54 @@ export interface components {
             /** Resource Values */
             resource_values: string[];
         };
+        /** GraphEdgeInput */
+        GraphEdgeInput: {
+            /** From Key */
+            from_key: string;
+            kind: components["schemas"]["WorkEdgeKind"];
+            /** To Key */
+            to_key: string;
+        };
+        /** GraphNodeInput */
+        GraphNodeInput: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Employee Id */
+            employee_id: string;
+            /** Key */
+            key: string;
+            /**
+             * Max Attempts
+             * @default 1
+             */
+            max_attempts: number;
+            /** Objective */
+            objective: string;
+            /** Required Actions */
+            required_actions?: string[];
+            /** Resource Kinds */
+            resource_kinds?: string[];
+            /** Resource Values */
+            resource_values?: string[];
+        };
+        /** GraphStrategyInput */
+        GraphStrategyInput: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Command Id */
+            command_id: string;
+            /** Edges */
+            edges?: components["schemas"]["GraphEdgeInput"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "graph";
+            /** Nodes */
+            nodes: components["schemas"]["GraphNodeInput"][];
+            /** Objective */
+            objective: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -610,6 +692,33 @@ export interface components {
              */
             status: "ok";
         };
+        /** StarChildInput */
+        StarChildInput: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Employee Id */
+            employee_id: string;
+            /** Objective */
+            objective: string;
+        };
+        /** StarStrategyInput */
+        StarStrategyInput: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Children */
+            children: components["schemas"]["StarChildInput"][];
+            /** Command Id */
+            command_id: string;
+            /** Coordinator Employee Id */
+            coordinator_employee_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "star";
+            /** Objective */
+            objective: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -623,6 +732,19 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** WorkEdge */
+        WorkEdge: {
+            /** From Node Id */
+            from_node_id: string;
+            kind: components["schemas"]["WorkEdgeKind"];
+            /** To Node Id */
+            to_node_id: string;
+        };
+        /**
+         * WorkEdgeKind
+         * @enum {string}
+         */
+        WorkEdgeKind: "depends_on" | "delegates_to" | "reviews" | "summarizes";
         /** WorkNode */
         WorkNode: {
             /** Acceptance Criteria */
@@ -631,12 +753,22 @@ export interface components {
             active_attempt_id: string | null;
             /** Assigned Employee Id */
             assigned_employee_id: string;
+            /**
+             * Attempt Count
+             * @default 0
+             */
+            attempt_count: number;
             /** Employee Revision Id */
             employee_revision_id: string;
             /** Failure Code */
             failure_code: string | null;
             /** Id */
             id: string;
+            /**
+             * Max Attempts
+             * @default 1
+             */
+            max_attempts: number;
             /** Objective */
             objective: string;
             status: components["schemas"]["WorkNodeStatus"];
@@ -647,7 +779,7 @@ export interface components {
          * WorkNodeStatus
          * @enum {string}
          */
-        WorkNodeStatus: "ready" | "waiting_approval" | "running" | "blocked" | "completed" | "failed" | "cancelled";
+        WorkNodeStatus: "draft" | "ready" | "waiting_approval" | "running" | "blocked" | "completed" | "failed" | "cancelled";
         /** WorkProjection */
         WorkProjection: {
             /** Artifacts */
@@ -659,6 +791,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Edges */
+            edges?: components["schemas"]["WorkEdge"][];
             /** Execution Links */
             execution_links: components["schemas"]["ExecutionLink"][];
             /** Graph Revision Id */
@@ -672,11 +806,7 @@ export interface components {
             /** Objective */
             objective: string;
             status: components["schemas"]["WorkStatus"];
-            /**
-             * Strategy
-             * @constant
-             */
-            strategy: "direct";
+            strategy: components["schemas"]["WorkStrategy"];
             /** Workspace Id */
             workspace_id: string;
         };
@@ -685,6 +815,11 @@ export interface components {
          * @enum {string}
          */
         WorkStatus: "queued" | "running" | "blocked" | "completed" | "failed" | "cancelled";
+        /**
+         * WorkStrategy
+         * @enum {string}
+         */
+        WorkStrategy: "direct" | "star" | "graph" | "battle";
         /** Workspace */
         Workspace: {
             /**
@@ -1503,7 +1638,7 @@ export interface operations {
             };
         };
     };
-    create_direct_work_workspaces__workspace_id__works_post: {
+    create_work_workspaces__workspace_id__works_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1514,7 +1649,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DirectWorkCreate"];
+                "application/json": components["schemas"]["DirectWorkCreate"] | (components["schemas"]["DirectStrategyInput"] | components["schemas"]["StarStrategyInput"] | components["schemas"]["GraphStrategyInput"] | components["schemas"]["BattleStrategyInput"]);
             };
         };
         responses: {
@@ -1536,13 +1671,22 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
         };

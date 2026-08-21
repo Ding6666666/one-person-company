@@ -7,6 +7,7 @@ import {
   type Employee,
   type EmployeeCreate,
   ProductApi,
+  type StrategyWorkCreate,
   type WorkProjection,
   type Workspace,
 } from './api.js'
@@ -167,6 +168,28 @@ export class CompanyController {
         selectedWorkId: work.id,
         selectedWork: work,
         events: [],
+      })
+      return work
+    } catch (error) {
+      if (this.isCurrentSelection(generation, workspaceId)) this.fail(error)
+      return undefined
+    }
+  }
+
+  async createStrategyWork(input: StrategyWorkCreate): Promise<WorkProjection | undefined> {
+    const workspaceId = this.current.selectedWorkspaceId
+    if (workspaceId === undefined) return undefined
+    const generation = this.selectionGeneration
+    this.workListGeneration += 1
+    this.publish({ ...this.current, pending: true, error: undefined })
+    try {
+      const work = await this.api.createWork(workspaceId, input)
+      if (!this.isCurrentSelection(generation, workspaceId)) return undefined
+      const works = [...this.current.works.filter(item => item.id !== work.id), work]
+      this.workRefreshGeneration += 1
+      this.publish({
+        ...this.current, phase: 'ready', pending: false, error: undefined,
+        works, selectedWorkId: work.id, selectedWork: work, events: [],
       })
       return work
     } catch (error) {

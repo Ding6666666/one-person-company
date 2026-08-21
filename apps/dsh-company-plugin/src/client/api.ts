@@ -19,6 +19,11 @@ export type Employee = ApiSchemas['Employee']
 export type WorkspaceCreate = ApiSchemas['WorkspaceCreate']
 export type EmployeeCreate = ApiSchemas['EmployeeCreate']
 export type DirectWorkCreate = ApiSchemas['DirectWorkCreate']
+export type DirectStrategyInput = ApiSchemas['DirectStrategyInput']
+export type StarStrategyInput = ApiSchemas['StarStrategyInput']
+export type GraphStrategyInput = ApiSchemas['GraphStrategyInput']
+export type BattleStrategyInput = ApiSchemas['BattleStrategyInput']
+export type StrategyWorkCreate = DirectStrategyInput | StarStrategyInput | GraphStrategyInput | BattleStrategyInput
 export type WorkProjection = ApiSchemas['WorkProjection']
 export type CompanyEvent = ApiSchemas['CompanyEvent']
 export type WorkspaceGrant = ApiSchemas['WorkspaceGrant']
@@ -72,7 +77,7 @@ const employeeSchema: z.ZodType<Employee> = z.object({
   binding: bindingSchema,
   grants: z.array(grantSchema),
 })
-const workNodeStatusSchema = z.enum(['ready', 'waiting_approval', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
+const workNodeStatusSchema = z.enum(['draft', 'ready', 'waiting_approval', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
 const workStatusSchema = z.enum(['queued', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
 const executionStatusSchema = z.enum([
   'dispatch_pending', 'running', 'cancel_requested', 'blocked', 'completed', 'failed', 'cancelled',
@@ -85,7 +90,7 @@ const workProjectionSchema: z.ZodType<WorkProjection> = z.object({
   status: workStatusSchema,
   graph_revision_id: z.string(),
   graph_revision_number: z.number(),
-  strategy: z.literal('direct'),
+  strategy: z.enum(['direct', 'star', 'graph', 'battle']),
   nodes: z.array(z.object({
     id: z.string(),
     objective: z.string(),
@@ -96,7 +101,14 @@ const workProjectionSchema: z.ZodType<WorkProjection> = z.object({
     active_attempt_id: z.string().nullable(),
     failure_code: z.string().nullable(),
     version: z.number(),
+    attempt_count: z.number().default(0),
+    max_attempts: z.number().default(1),
   })),
+  edges: z.array(z.object({
+    from_node_id: z.string(),
+    to_node_id: z.string(),
+    kind: z.enum(['depends_on', 'delegates_to', 'reviews', 'summarizes']),
+  })).default([]),
   execution_links: z.array(z.object({
     id: z.string(),
     node_id: z.string(),
@@ -209,6 +221,15 @@ export class ProductApi {
   }
 
   createDirectWork(workspaceId: string, body: DirectWorkCreate): Promise<WorkProjection> {
+    return this.request(
+      'POST',
+      `/workspaces/${encodeURIComponent(workspaceId)}/works`,
+      body,
+      workProjectionSchema,
+    )
+  }
+
+  createWork(workspaceId: string, body: StrategyWorkCreate): Promise<WorkProjection> {
     return this.request(
       'POST',
       `/workspaces/${encodeURIComponent(workspaceId)}/works`,

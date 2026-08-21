@@ -1,10 +1,12 @@
 import { useState } from 'react'
 
-import type { ProductApi, WorkProjection } from './api.js'
+import type { Employee, ProductApi, WorkProjection } from './api.js'
 import { ApprovalInbox } from './ApprovalInbox.js'
+import { BattleView } from './BattleView.js'
 import { CapabilityEditor } from './CapabilityEditor.js'
 import { CompanyHistory } from './CompanyHistory.js'
 import { DelegationView } from './DelegationView.js'
+import { WorkGraphView } from './WorkGraphView.js'
 import type { Translate } from './locales.js'
 import styles from './Work.module.css'
 import { Button } from './ui/Primitives.js'
@@ -44,7 +46,7 @@ function ArtifactResult({ artifact, t }: {
   </div>
 }
 
-export function WorkDetail({ work, events, pending, onCancel, governance, t }: {
+export function WorkDetail({ work, events, pending, onCancel, governance, employees, t }: {
   readonly work: WorkProjection
   readonly events: Parameters<typeof CompanyHistory>[0]['events']
   readonly pending: boolean
@@ -54,12 +56,12 @@ export function WorkDetail({ work, events, pending, onCancel, governance, t }: {
     readonly workspaceId: string
     readonly onWorkUpdated: (work: WorkProjection) => void
   }
+  readonly employees?: readonly Employee[] | undefined
   readonly t: Translate
 }) {
   const [governanceOpen, setGovernanceOpen] = useState(false)
   const cancelRequested = work.execution_links.some(link => link.status === 'cancel_requested')
   const canCancel = work.execution_links.some(link => link.status === 'dispatch_pending' || link.status === 'running')
-  const failureCodes = work.nodes.flatMap(node => node.failure_code === null ? [] : [node.failure_code])
   const status = work.status === 'cancelled'
     ? t('statusCancelled')
     : cancelRequested
@@ -73,11 +75,12 @@ export function WorkDetail({ work, events, pending, onCancel, governance, t }: {
         {t('requestCancel')}
       </Button>}
     </header>
-    {failureCodes.length > 0 && <p>{t('failureReason')}: <code>{failureCodes.join(', ')}</code></p>}
     <section>
       <h3>{t('acceptanceCriteria')}</h3>
       <ul>{work.nodes.flatMap(node => node.acceptance_criteria).map((criterion, index) => <li key={`${index}-${criterion}`}>{criterion}</li>)}</ul>
     </section>
+    {work.strategy === 'battle' && <BattleView work={work} employees={employees} t={t} />}
+    {work.strategy !== 'battle' && <WorkGraphView work={work} employees={employees} t={t} />}
     {work.artifacts.length > 0 && <section className={styles.artifacts}>
       <h3>{t('results')}</h3>
       {work.artifacts.map(artifact => <ArtifactResult key={artifact.id} artifact={artifact} t={t} />)}

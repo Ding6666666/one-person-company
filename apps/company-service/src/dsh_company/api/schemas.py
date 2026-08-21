@@ -9,8 +9,10 @@ from dsh_company.domain.work import (
 )
 from dsh_company.domain.work import (
     ExecutionStatus,
+    WorkEdgeKind,
     WorkNodeStatus,
     WorkStatus,
+    WorkStrategy,
 )
 from dsh_company.domain.workspace import Workspace as DomainWorkspace
 
@@ -260,10 +262,117 @@ class Employee(BaseModel):
 
 
 class DirectWorkCreate(BaseModel):
+    model_config = {"extra": "forbid"}
+
     employee_id: NonBlank
     objective: NonBlank
     acceptance_criteria: list[NonBlank] = Field(min_length=1)
     command_id: NonBlank
+
+
+WorkObjective = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+]
+WorkCriterion = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+]
+NodeKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
+class StrategyWorkBase(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    objective: WorkObjective
+    acceptance_criteria: list[WorkCriterion] = Field(min_length=1, max_length=50)
+    command_id: NonBlank
+
+
+class DirectStrategyInput(StrategyWorkBase):
+    kind: Literal["direct"]
+    employee_id: NonBlank
+
+
+class StarChildInput(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    employee_id: NonBlank
+    objective: WorkObjective
+    acceptance_criteria: list[WorkCriterion] = Field(min_length=1, max_length=50)
+
+
+class StarStrategyInput(StrategyWorkBase):
+    kind: Literal["star"]
+    coordinator_employee_id: NonBlank
+    children: list[StarChildInput] = Field(min_length=1, max_length=16)
+
+
+class GraphNodeInput(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    key: NodeKey
+    employee_id: NonBlank
+    objective: WorkObjective
+    acceptance_criteria: list[WorkCriterion] = Field(min_length=1, max_length=50)
+    required_actions: list[Action] = Field(default_factory=list, max_length=8)
+    resource_values: list[BoundedResource] = Field(default_factory=list, max_length=50)
+    resource_kinds: list[ResourceKind] = Field(default_factory=list, max_length=8)
+    max_attempts: int = Field(default=1, ge=1, le=10)
+
+    @model_validator(mode="after")
+    def validate_policy_inputs(self) -> "GraphNodeInput":
+        from dsh_company.domain.policy import ACTION_LEVELS
+
+        if len(self.required_actions) != len(set(self.required_actions)):
+            raise ValueError("required actions must be unique")
+        if any(action not in ACTION_LEVELS for action in self.required_actions):
+            raise ValueError("required actions must use the closed catalog")
+        if len(self.resource_kinds) != len(self.required_actions):
+            raise ValueError("resource kinds must align with required actions")
+        return self
+
+
+class GraphEdgeInput(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    from_key: NodeKey
+    to_key: NodeKey
+    kind: WorkEdgeKind
+
+
+class GraphStrategyInput(StrategyWorkBase):
+    kind: Literal["graph"]
+    nodes: list[GraphNodeInput] = Field(min_length=1, max_length=32)
+    edges: list[GraphEdgeInput] = Field(default_factory=list, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_unique_graph_facts(self) -> "GraphStrategyInput":
+        keys = [node.key for node in self.nodes]
+        if len(keys) != len(set(keys)):
+            raise ValueError("graph node keys must be unique")
+        edge_keys = [(edge.from_key, edge.to_key, edge.kind) for edge in self.edges]
+        if len(edge_keys) != len(set(edge_keys)):
+            raise ValueError("graph edges must be unique")
+        return self
+
+
+class BattleStrategyInput(StrategyWorkBase):
+    kind: Literal["battle"]
+    participant_employee_ids: list[NonBlank] = Field(min_length=2, max_length=4)
+    summarizer_employee_id: NonBlank
+
+    @model_validator(mode="after")
+    def validate_distinct_participants(self) -> "BattleStrategyInput":
+        if len(self.participant_employee_ids) != len(set(self.participant_employee_ids)):
+            raise ValueError("battle participants must be distinct")
+        if self.summarizer_employee_id in self.participant_employee_ids:
+            raise ValueError("battle summarizer must be distinct")
+        return self
+
+
+StrategyWorkCreate = Annotated[
+    DirectStrategyInput | StarStrategyInput | GraphStrategyInput | BattleStrategyInput,
+    Field(discriminator="kind"),
+]
 
 
 class WorkNode(BaseModel):
@@ -276,6 +385,14 @@ class WorkNode(BaseModel):
     active_attempt_id: str | None
     failure_code: str | None
     version: int
+    attempt_count: int = 0
+    max_attempts: int = 1
+
+
+class WorkEdge(BaseModel):
+    from_node_id: str
+    to_node_id: str
+    kind: WorkEdgeKind
 
 
 class ExecutionLink(BaseModel):
@@ -303,8 +420,9 @@ class WorkProjection(BaseModel):
     status: WorkStatus
     graph_revision_id: str
     graph_revision_number: int
-    strategy: Literal["direct"]
+    strategy: WorkStrategy
     nodes: list[WorkNode]
+    edges: list[WorkEdge] = Field(default_factory=list)
     execution_links: list[ExecutionLink]
     artifacts: list[ArtifactReference]
     created_at: datetime
@@ -319,7 +437,7 @@ class WorkProjection(BaseModel):
             status=aggregate.work.status,
             graph_revision_id=aggregate.graph.id,
             graph_revision_number=aggregate.graph.revision_number,
-            strategy="direct",
+            strategy=aggregate.graph.strategy,
             nodes=[
                 WorkNode(
                     id=node.id,
@@ -331,8 +449,18 @@ class WorkProjection(BaseModel):
                     active_attempt_id=node.active_attempt_id,
                     failure_code=node.failure_code,
                     version=node.version,
+                    attempt_count=node.attempt_count,
+                    max_attempts=node.max_attempts,
                 )
                 for node in aggregate.nodes
+            ],
+            edges=[
+                WorkEdge(
+                    from_node_id=edge.from_node_id,
+                    to_node_id=edge.to_node_id,
+                    kind=edge.kind,
+                )
+                for edge in aggregate.graph.edges
             ],
             execution_links=[
                 ExecutionLink(

@@ -17,7 +17,7 @@ const now = '2026-08-21T00:00:00Z'
 const work: WorkProjection = {
   id: 'work-1', workspace_id: 'ws-1', command_id: 'cmd-1', objective: 'Publish notes', status: 'blocked',
   graph_revision_id: 'graph-1', graph_revision_number: 1, strategy: 'direct', created_at: now,
-  nodes: [{ id: 'node-1', objective: 'Publish notes', acceptance_criteria: ['Published'], assigned_employee_id: 'emp-a', employee_revision_id: 'rev-a', status: 'waiting_approval', active_attempt_id: null, failure_code: null, version: 2 }],
+  nodes: [{ id: 'node-1', objective: 'Publish notes', acceptance_criteria: ['Published'], assigned_employee_id: 'emp-a', employee_revision_id: 'rev-a', status: 'waiting_approval', active_attempt_id: null, failure_code: null, version: 2, attempt_count: 0, max_attempts: 1 }],
   execution_links: [{ id: 'link-1', node_id: 'node-1', attempt_id: 'attempt-1', status: 'dispatch_pending', started_at: null, finished_at: null, diagnostic_code: null }],
   artifacts: [],
 }

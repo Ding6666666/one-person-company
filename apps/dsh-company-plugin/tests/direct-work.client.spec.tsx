@@ -46,6 +46,7 @@ function projection(status: Schemas['WorkStatus'], executionStatus: Schemas['Exe
       id: 'node-1', objective: '撰写发布稿', acceptance_criteria: ['包含标题'],
       assigned_employee_id: employee.id, employee_revision_id: employee.current_revision_id,
       status: status === 'queued' ? 'ready' : status, active_attempt_id: 'attempt-1', failure_code: null, version: 1,
+      attempt_count: 1, max_attempts: 1,
     }],
     execution_links: [{
       id: 'link-1', node_id: 'node-1', attempt_id: 'attempt-1', status: executionStatus,
@@ -197,6 +198,23 @@ describe('Direct work client', () => {
     expect(screen.getByText('已阻塞')).toBeVisible()
     expect(screen.getByText('runtime_process_lost')).toBeVisible()
     expect(screen.queryByRole('button', { name: '请求取消' })).not.toBeInTheDocument()
+  })
+
+  it('renders authoritative graph facts for selected Direct work', () => {
+    const direct = projection('blocked')
+    direct.nodes[0]!.status = 'waiting_approval'
+    direct.nodes[0]!.failure_code = 'policy_wait'
+    direct.nodes[0]!.attempt_count = 1
+    direct.nodes[0]!.max_attempts = 2
+
+    render(<WorkDetail work={direct} events={[]} pending={false} onCancel={vi.fn()} employees={[employee]} t={translate('en')} />)
+
+    const card = screen.getByRole('article', { name: /撰写发布稿/ })
+    expect(card).toHaveTextContent('编辑')
+    expect(card).toHaveTextContent('Waiting for approval')
+    expect(card).toHaveTextContent('Attempts: 1 / 2')
+    expect(card).toHaveTextContent('Approval: waiting')
+    expect(card).toHaveTextContent('policy_wait')
   })
 
   it('offers cancellation only while execution is dispatching or running', () => {

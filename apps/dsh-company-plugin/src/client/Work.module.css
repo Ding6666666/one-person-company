@@ -30,3 +30,8 @@
 .eventType { color: #52606d; font-size: 0.8rem; }
 .artifacts { display: grid; gap: 0.75rem; }
 .artifacts input { flex: 1; min-width: 0; }
+.graph { border-top: 1px solid #d7dee5; display: grid; gap: 0.75rem; padding-top: 1rem; }
+.graphNodes { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+.graphNode { border: 1px solid #c8d1dc; border-left: 0.3rem solid #52606d; border-radius: 0.35rem; display: grid; gap: 0.35rem; padding: 0.75rem; }
+.graphNode h4,
+.graphNode p { margin: 0; }

@@ -47,6 +47,23 @@ def test_create_workspace_and_employee_without_provider_credentials(
     assert employee.json()["binding"]["dsh_session_id"].startswith("employee-")
 
 
+def test_non_work_request_validation_uses_fastapi_default_contract(
+    client: TestClient,
+) -> None:
+    response = client.post("/workspaces", json={"name": "x" * 121})
+
+    assert response.status_code == 422
+    assert "detail" in response.json()
+    assert "error" not in response.json()
+    openapi = client.get("/openapi.json").json()
+    assert (
+        openapi["paths"]["/workspaces"]["post"]["responses"]["422"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
+        == "#/components/schemas/HTTPValidationError"
+    )
+
+
 def test_list_get_and_revise_workspace_employee(client: TestClient) -> None:
     workspace = client.post("/workspaces", json={"name": "内容公司"}).json()
     employee = client.post(
