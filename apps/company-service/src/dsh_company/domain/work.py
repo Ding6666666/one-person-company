@@ -49,6 +49,9 @@ class ExecutionStatus(StrEnum):
 
 class WorkStrategy(StrEnum):
     DIRECT = "direct"
+    STAR = "star"
+    GRAPH = "graph"
+    BATTLE = "battle"
 
 
 class WorkEdgeKind(StrEnum):
