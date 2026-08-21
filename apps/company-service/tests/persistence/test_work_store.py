@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from dsh_company.domain.delegation import DelegationProposal, apply_delegation
 from dsh_company.domain.employee import Employee
 from dsh_company.domain.ids import (
     ArtifactReferenceId,
@@ -139,6 +140,45 @@ def test_direct_graph_and_attempt_round_trip(
     assert stored is not None
     assert isinstance(stored.nodes[0].acceptance_criteria, tuple)
     assert stored.work.created_at.tzinfo is UTC
+
+
+def test_reloaded_direct_graph_can_be_delegated_without_rewriting_node_facts(
+    sqlite_uow: SqlAlchemyUnitOfWork,
+) -> None:
+    aggregate = _aggregate()
+    with sqlite_uow as uow:
+        revision_id = _seed_company(uow)
+        aggregate = replace(
+            aggregate,
+            nodes=(replace(aggregate.nodes[0], employee_revision_id=revision_id),),
+        )
+        uow.works.add(aggregate)
+        uow.commit()
+
+    with sqlite_uow as uow:
+        stored = uow.works.get(aggregate.work.id)
+
+    assert stored is not None
+    revised, _delegation = apply_delegation(
+        stored.graph,
+        stored.nodes,
+        DelegationProposal(
+            proposer_employee_id=stored.nodes[0].assigned_employee_id,
+            target_employee_id=EmployeeId("emp-2"),
+            objective="Fact check",
+            acceptance_criteria=("List sources",),
+            required_actions=("workspace.read",),
+            resource_values=("ws-1",),
+        ),
+        workspace_id=stored.work.workspace_id,
+        source_node_id=stored.nodes[0].id,
+        target_employee_revision_id=EmployeeRevisionId("revision-emp-2"),
+        ids=lambda prefix: f"{prefix}-2",
+    )
+
+    assert stored.graph.node_ids == (stored.nodes[0].id,)
+    assert revised.nodes[0] is stored.nodes[0]
+    assert revised.nodes[0] == aggregate.nodes[0]
 
 
 def test_command_id_is_unique_per_workspace(

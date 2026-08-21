@@ -60,6 +60,8 @@ def test_direct_work_creates_one_frozen_node() -> None:
     assert work.current_graph_revision_id == graph.id
     assert graph.strategy is WorkStrategy.DIRECT
     assert graph.revision_number == 1
+    assert graph.node_ids == (node.id,)
+    assert graph.edges == ()
     assert node.status is WorkNodeStatus.READY
     assert node.acceptance_criteria == ("包含标题", "不超过 800 字")
     assert node.employee_revision_id == EmployeeRevisionId("rev-1")

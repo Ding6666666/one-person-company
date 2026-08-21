@@ -304,6 +304,7 @@ class WorkRepository:
                 revision_number=graph_row.revision_number,
                 strategy=WorkStrategy(graph_row.strategy),
                 created_at=_from_sqlite_utc(graph_row.created_at),
+                node_ids=tuple(WorkNodeId(row.id) for row in node_rows),
             ),
             nodes=tuple(self._node(row) for row in node_rows),
             execution_links=tuple(self._link(row) for row in link_rows),

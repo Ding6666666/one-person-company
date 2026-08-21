@@ -28,6 +28,7 @@ class WorkStatus(StrEnum):
 
 class WorkNodeStatus(StrEnum):
     READY = "ready"
+    WAITING_APPROVAL = "waiting_approval"
     RUNNING = "running"
     BLOCKED = "blocked"
     COMPLETED = "completed"
@@ -49,6 +50,11 @@ class WorkStrategy(StrEnum):
     DIRECT = "direct"
 
 
+class WorkEdgeKind(StrEnum):
+    DEPENDS_ON = "depends_on"
+    DELEGATES_TO = "delegates_to"
+
+
 def _expect_status(actual: StrEnum, expected: StrEnum) -> None:
     if actual is not expected:
         raise ValueError(f"transition requires {expected.name} status, got {actual.name}")
@@ -62,12 +68,50 @@ def _expect_attempt(actual: AttemptId | None, expected: AttemptId) -> None:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkEdge:
+    from_node_id: WorkNodeId
+    to_node_id: WorkNodeId
+    kind: WorkEdgeKind
+
+
+@dataclass(frozen=True, slots=True)
 class WorkGraphRevision:
     id: WorkGraphRevisionId
     work_id: WorkId
     revision_number: int
     strategy: WorkStrategy
     created_at: datetime
+    node_ids: tuple[WorkNodeId, ...] = ()
+    edges: tuple[WorkEdge, ...] = ()
+
+    def __post_init__(self) -> None:
+        if len(set(self.node_ids)) != len(self.node_ids):
+            raise ValueError("graph revision node IDs must be unique")
+        known_nodes = set(self.node_ids)
+        if any(
+            edge.from_node_id not in known_nodes or edge.to_node_id not in known_nodes
+            for edge in self.edges
+        ):
+            raise ValueError("graph edge references an unknown node")
+        outgoing = {node_id: [] for node_id in self.node_ids}
+        for edge in self.edges:
+            outgoing[edge.from_node_id].append(edge.to_node_id)
+        visiting: set[WorkNodeId] = set()
+        visited: set[WorkNodeId] = set()
+
+        def visit(node_id: WorkNodeId) -> None:
+            if node_id in visiting:
+                raise ValueError("work graph must be acyclic")
+            if node_id in visited:
+                return
+            visiting.add(node_id)
+            for target_id in outgoing[node_id]:
+                visit(target_id)
+            visiting.remove(node_id)
+            visited.add(node_id)
+
+        for node_id in self.node_ids:
+            visit(node_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +127,34 @@ class WorkNode:
     active_attempt_id: AttemptId | None
     failure_code: str | None
     version: int
+
+    def wait_for_approval(self) -> "WorkNode":
+        _expect_status(self.status, WorkNodeStatus.READY)
+        return replace(
+            self,
+            status=WorkNodeStatus.WAITING_APPROVAL,
+            active_attempt_id=None,
+            failure_code=None,
+            version=self.version + 1,
+        )
+
+    def approval_approved(self) -> "WorkNode":
+        _expect_status(self.status, WorkNodeStatus.WAITING_APPROVAL)
+        return replace(
+            self,
+            status=WorkNodeStatus.READY,
+            failure_code=None,
+            version=self.version + 1,
+        )
+
+    def approval_rejected(self) -> "WorkNode":
+        _expect_status(self.status, WorkNodeStatus.WAITING_APPROVAL)
+        return replace(
+            self,
+            status=WorkNodeStatus.FAILED,
+            failure_code="approval_rejected",
+            version=self.version + 1,
+        )
 
     def start(self, attempt_id: AttemptId) -> "WorkNode":
         _expect_status(self.status, WorkNodeStatus.READY)
@@ -200,6 +272,7 @@ class Work:
             revision_number=1,
             strategy=WorkStrategy.DIRECT,
             created_at=now,
+            node_ids=(node_id,),
         )
         node = WorkNode(
             id=node_id,

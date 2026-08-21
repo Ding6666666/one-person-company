@@ -344,6 +344,7 @@ def test_openapi_publishes_closed_authoritative_work_statuses(
     }
     assert set(schemas["WorkNodeStatus"]["enum"]) == {
         "ready",
+        "waiting_approval",
         "running",
         "blocked",
         "completed",

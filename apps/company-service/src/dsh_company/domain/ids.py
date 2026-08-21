@@ -13,6 +13,8 @@ ExecutionLinkId = NewType("ExecutionLinkId", str)
 AttemptId = NewType("AttemptId", str)
 CompanyEventId = NewType("CompanyEventId", str)
 ArtifactReferenceId = NewType("ArtifactReferenceId", str)
+ApprovalId = NewType("ApprovalId", str)
+DelegationId = NewType("DelegationId", str)
 
 
 def new_id(prefix: str) -> str:
