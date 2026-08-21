@@ -4,7 +4,10 @@ from dataclasses import dataclass, field
 from fastapi import APIRouter
 
 from dsh_company.api.company import router as company_router
+from dsh_company.api.governance import router as governance_router
 from dsh_company.api.work import router as work_router
+from dsh_company.application.delegation_service import DelegationService
+from dsh_company.application.governance_service import GovernanceService
 from dsh_company.application.ports import WorkCoordinator, WorkUnitOfWork
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
 from dsh_company.application.runtime_governance import RuntimeGovernanceHandler
@@ -24,6 +27,14 @@ def _noop() -> None:
     return None
 
 
+def _unconfigured_governance_service() -> GovernanceService:
+    raise RuntimeError("governance assembly is not configured")
+
+
+def _unconfigured_delegation_service() -> DelegationService:
+    raise RuntimeError("delegation assembly is not configured")
+
+
 class _UnconfiguredWorkCoordinator:
     def enqueue(self, node_id: WorkNodeId) -> None:
         del node_id
@@ -38,6 +49,7 @@ def _company_router() -> APIRouter:
     router = APIRouter()
     router.include_router(company_router)
     router.include_router(work_router)
+    router.include_router(governance_router)
     return router
 
 
@@ -45,6 +57,8 @@ def _company_router() -> APIRouter:
 class ComponentAssembly:
     uow_factory: Callable[[], WorkUnitOfWork] = _unconfigured_uow
     work_coordinator: WorkCoordinator = field(default_factory=_UnconfiguredWorkCoordinator)
+    governance_service_factory: Callable[[], GovernanceService] = _unconfigured_governance_service
+    delegation_service_factory: Callable[[], DelegationService] = _unconfigured_delegation_service
     router: APIRouter = field(default_factory=_company_router)
     startup: Callable[[], None] = _noop
     dispose: Callable[[], None] = _noop
@@ -86,6 +100,12 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
             governance_handler=governance_handler,
             runtime_concurrency=settings.runtime_concurrency,
         )
+
+        def governance_service_factory() -> GovernanceService:
+            return GovernanceService(uow_factory(), PolicyEngine(), coordinator)
+
+        def delegation_service_factory() -> DelegationService:
+            return DelegationService(uow_factory(), PolicyEngine(), coordinator)
     except BaseException:
         engine.dispose()
         raise
@@ -99,6 +119,8 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
     return ComponentAssembly(
         uow_factory=uow_factory,
         work_coordinator=coordinator,
+        governance_service_factory=governance_service_factory,
+        delegation_service_factory=delegation_service_factory,
         startup=coordinator.start,
         dispose=dispose,
     )

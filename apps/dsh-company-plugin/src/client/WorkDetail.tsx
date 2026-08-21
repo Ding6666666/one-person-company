@@ -1,7 +1,10 @@
 import { useState } from 'react'
 
-import type { WorkProjection } from './api.js'
+import type { ProductApi, WorkProjection } from './api.js'
+import { ApprovalInbox } from './ApprovalInbox.js'
+import { CapabilityEditor } from './CapabilityEditor.js'
 import { CompanyHistory } from './CompanyHistory.js'
+import { DelegationView } from './DelegationView.js'
 import type { Translate } from './locales.js'
 import styles from './Work.module.css'
 import { Button } from './ui/Primitives.js'
@@ -41,13 +44,19 @@ function ArtifactResult({ artifact, t }: {
   </div>
 }
 
-export function WorkDetail({ work, events, pending, onCancel, t }: {
+export function WorkDetail({ work, events, pending, onCancel, governance, t }: {
   readonly work: WorkProjection
   readonly events: Parameters<typeof CompanyHistory>[0]['events']
   readonly pending: boolean
   readonly onCancel: () => void
+  readonly governance?: {
+    readonly api: ProductApi
+    readonly workspaceId: string
+    readonly onWorkUpdated: (work: WorkProjection) => void
+  }
   readonly t: Translate
 }) {
+  const [governanceOpen, setGovernanceOpen] = useState(false)
   const cancelRequested = work.execution_links.some(link => link.status === 'cancel_requested')
   const canCancel = work.execution_links.some(link => link.status === 'dispatch_pending' || link.status === 'running')
   const failureCodes = work.nodes.flatMap(node => node.failure_code === null ? [] : [node.failure_code])
@@ -73,6 +82,20 @@ export function WorkDetail({ work, events, pending, onCancel, t }: {
       <h3>{t('results')}</h3>
       {work.artifacts.map(artifact => <ArtifactResult key={artifact.id} artifact={artifact} t={t} />)}
     </section>}
+    {governance !== undefined && <Button type="button" onClick={() => setGovernanceOpen(value => !value)} aria-expanded={governanceOpen}>
+      {t('governance')}
+    </Button>}
+    {governance !== undefined && governanceOpen && <>
+      <CapabilityEditor api={governance.api} workspaceId={governance.workspaceId} t={t} />
+      <ApprovalInbox
+        api={governance.api}
+        workspaceId={governance.workspaceId}
+        refreshKey={work.nodes.map(node => `${node.id}:${node.status}:${node.version}`).join('|')}
+        onWorkUpdated={governance.onWorkUpdated}
+        t={t}
+      />
+      <DelegationView api={governance.api} work={work} onWorkUpdated={governance.onWorkUpdated} t={t} />
+    </>}
     <CompanyHistory events={events} t={t} />
   </article>
 }

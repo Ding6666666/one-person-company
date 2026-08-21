@@ -36,7 +36,8 @@ export function CompanySurface({
   initialWorkspaceId,
   pollingIntervalMs = 1_000,
 }: CompanySurfaceProps) {
-  const controller = useMemo(() => new CompanyController(new ProductApi(remote)), [remote])
+  const api = useMemo(() => new ProductApi(remote), [remote])
+  const controller = useMemo(() => new CompanyController(api), [api])
   const snapshot = useCompanyController(controller)
   const [workspaceDialog, setWorkspaceDialog] = useState(false)
   const [employeeDialog, setEmployeeDialog] = useState(false)
@@ -150,6 +151,11 @@ export function CompanySurface({
             events={snapshot.events}
             pending={snapshot.pending}
             onCancel={() => { void controller.cancelSelectedWork() }}
+            governance={{
+              api,
+              workspaceId: snapshot.selectedWork.workspace_id,
+              onWorkUpdated: work => controller.applyAuthoritativeWork(work),
+            }}
             t={t}
           />}
         </div>}

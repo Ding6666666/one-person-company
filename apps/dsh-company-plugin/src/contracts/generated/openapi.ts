@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/approvals/{approval_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_approvals__approval_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals/{approval_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject */
+        post: operations["reject_approvals__approval_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/employees/{employee_id}": {
         parameters: {
             query?: never;
@@ -89,6 +123,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/works/{work_id}/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Work Delegations */
+        get: operations["list_work_delegations_works__work_id__delegations_get"];
+        put?: never;
+        /** Create Delegation */
+        post: operations["create_delegation_works__work_id__delegations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/works/{work_id}/events": {
         parameters: {
             query?: never;
@@ -141,6 +193,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspace_id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Workspace Approvals */
+        get: operations["list_workspace_approvals_workspaces__workspace_id__approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workspaces/{workspace_id}/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Workspace Capabilities */
+        get: operations["get_workspace_capabilities_workspaces__workspace_id__capabilities_get"];
+        /** Replace Workspace Capabilities */
+        put: operations["replace_workspace_capabilities_workspaces__workspace_id__capabilities_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspace_id}/employees": {
         parameters: {
             query?: never;
@@ -181,6 +268,48 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ApprovalDecision */
+        ApprovalDecision: {
+            /** Decided By */
+            decided_by: string;
+        };
+        /** ApprovalDecisionProjection */
+        ApprovalDecisionProjection: {
+            approval: components["schemas"]["ApprovalProjection"];
+            work: components["schemas"]["WorkProjection"];
+        };
+        /** ApprovalProjection */
+        ApprovalProjection: {
+            /** Action */
+            action: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By */
+            decided_by: string | null;
+            /** Id */
+            id: string;
+            /** Node Id */
+            node_id: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            requesting_employee: components["schemas"]["EmployeeSummary"];
+            /** Resources */
+            resources: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected" | "cancelled";
+            /** Work Id */
+            work_id: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
         /** ArtifactReference */
         ArtifactReference: {
             /**
@@ -223,6 +352,64 @@ export interface components {
             work_id: string;
             /** Workspace Id */
             workspace_id: string;
+        };
+        /** DelegationCollection */
+        DelegationCollection: {
+            /** Delegations */
+            delegations: components["schemas"]["DelegationProjection"][];
+            /** Eligible Employees */
+            eligible_employees: components["schemas"]["EmployeeSummary"][];
+        };
+        /** DelegationCreate */
+        DelegationCreate: {
+            /** Acceptance Criteria */
+            acceptance_criteria: string[];
+            /** Objective */
+            objective: string;
+            /** Proposer Employee Id */
+            proposer_employee_id: string;
+            /** Required Actions */
+            required_actions: string[];
+            /** Resource Values */
+            resource_values: string[];
+            /** Source Node Id */
+            source_node_id: string;
+            /** Target Employee Id */
+            target_employee_id: string;
+        };
+        /** DelegationProjection */
+        DelegationProjection: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Graph Revision Id */
+            graph_revision_id: string;
+            /** Id */
+            id: string;
+            /** Proposer Employee Id */
+            proposer_employee_id: string;
+            /** Source Node Id */
+            source_node_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "proposed" | "accepted" | "rejected" | "completed";
+            /** Target Employee Id */
+            target_employee_id: string;
+            /** Target Node Id */
+            target_node_id: string | null;
+            /** Work Id */
+            work_id: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** DelegationResultProjection */
+        DelegationResultProjection: {
+            delegation: components["schemas"]["DelegationProjection"];
+            work: components["schemas"]["WorkProjection"];
         };
         /** DirectWorkCreate */
         DirectWorkCreate: {
@@ -327,6 +514,13 @@ export interface components {
             revision_number: number;
             /** Runtime Profile */
             runtime_profile: string;
+        };
+        /** EmployeeSummary */
+        EmployeeSummary: {
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
         };
         /** ErrorDetail */
         ErrorDetail: {
@@ -453,7 +647,7 @@ export interface components {
          * WorkNodeStatus
          * @enum {string}
          */
-        WorkNodeStatus: "ready" | "running" | "blocked" | "completed" | "failed" | "cancelled";
+        WorkNodeStatus: "ready" | "waiting_approval" | "running" | "blocked" | "completed" | "failed" | "cancelled";
         /** WorkProjection */
         WorkProjection: {
             /** Artifacts */
@@ -503,10 +697,38 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** WorkspaceCapabilities */
+        WorkspaceCapabilities: {
+            /** Grants */
+            grants: components["schemas"]["WorkspaceGrant"][];
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /** WorkspaceCapabilitiesUpdate */
+        WorkspaceCapabilitiesUpdate: {
+            /** Grants */
+            grants: components["schemas"]["GrantCreate"][];
+        };
         /** WorkspaceCreate */
         WorkspaceCreate: {
             /** Name */
             name: string;
+        };
+        /** WorkspaceGrant */
+        WorkspaceGrant: {
+            /** Action */
+            action: string;
+            /**
+             * Level
+             * @enum {integer}
+             */
+            level: 0 | 1 | 2 | 3;
+            /** Requires Approval */
+            requires_approval: boolean;
+            /** Resource Kind */
+            resource_kind: string;
+            /** Resource Values */
+            resource_values: string[];
         };
     };
     responses: never;
@@ -517,6 +739,112 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    approve_approvals__approval_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDecisionProjection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_approvals__approval_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDecisionProjection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_employee_employees__employee_id__get: {
         parameters: {
             query?: never;
@@ -701,6 +1029,99 @@ export interface operations {
             };
         };
     };
+    list_work_delegations_works__work_id__delegations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationCollection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_delegation_works__work_id__delegations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DelegationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelegationResultProjection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_work_events_works__work_id__events_get: {
         parameters: {
             query?: never;
@@ -812,6 +1233,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Workspace"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_workspace_approvals_workspaces__workspace_id__approvals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalProjection"][];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_workspace_capabilities_workspaces__workspace_id__capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCapabilities"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_workspace_capabilities_workspaces__workspace_id__capabilities_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceCapabilitiesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCapabilities"];
                 };
             };
             /** @description Not Found */

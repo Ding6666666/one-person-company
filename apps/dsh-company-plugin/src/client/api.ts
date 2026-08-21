@@ -21,6 +21,14 @@ export type EmployeeCreate = ApiSchemas['EmployeeCreate']
 export type DirectWorkCreate = ApiSchemas['DirectWorkCreate']
 export type WorkProjection = ApiSchemas['WorkProjection']
 export type CompanyEvent = ApiSchemas['CompanyEvent']
+export type WorkspaceGrant = ApiSchemas['WorkspaceGrant']
+export type WorkspaceCapabilities = ApiSchemas['WorkspaceCapabilities']
+export type WorkspaceCapabilitiesUpdate = ApiSchemas['WorkspaceCapabilitiesUpdate']
+export type ApprovalProjection = ApiSchemas['ApprovalProjection']
+export type ApprovalDecisionProjection = ApiSchemas['ApprovalDecisionProjection']
+export type DelegationCreate = ApiSchemas['DelegationCreate']
+export type DelegationCollection = ApiSchemas['DelegationCollection']
+export type DelegationResultProjection = ApiSchemas['DelegationResultProjection']
 
 const workspaceSchema: z.ZodType<Workspace> = z.object({
   id: z.string(),
@@ -64,7 +72,7 @@ const employeeSchema: z.ZodType<Employee> = z.object({
   binding: bindingSchema,
   grants: z.array(grantSchema),
 })
-const workNodeStatusSchema = z.enum(['ready', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
+const workNodeStatusSchema = z.enum(['ready', 'waiting_approval', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
 const workStatusSchema = z.enum(['queued', 'running', 'blocked', 'completed', 'failed', 'cancelled'])
 const executionStatusSchema = z.enum([
   'dispatch_pending', 'running', 'cancel_requested', 'blocked', 'completed', 'failed', 'cancelled',
@@ -117,6 +125,34 @@ const companyEventSchema: z.ZodType<CompanyEvent> = z.object({
   summary: z.string(),
   source: z.string(),
   observed_at: z.string(),
+})
+const workspaceGrantSchema: z.ZodType<WorkspaceGrant> = z.object({
+  action: z.string(), level: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]),
+  resource_kind: z.string(), resource_values: z.array(z.string()), requires_approval: z.boolean(),
+})
+const workspaceCapabilitiesSchema: z.ZodType<WorkspaceCapabilities> = z.object({
+  workspace_id: z.string(), grants: z.array(workspaceGrantSchema),
+})
+const employeeSummarySchema = z.object({ id: z.string(), display_name: z.string() })
+const approvalProjectionSchema: z.ZodType<ApprovalProjection> = z.object({
+  id: z.string(), workspace_id: z.string(), work_id: z.string(), node_id: z.string(), action: z.string(),
+  resources: z.array(z.string()), reason: z.string(), status: z.enum(['pending', 'approved', 'rejected', 'cancelled']),
+  requested_at: z.string(), decided_at: z.string().nullable(), decided_by: z.string().nullable(),
+  requesting_employee: employeeSummarySchema,
+})
+const approvalDecisionProjectionSchema: z.ZodType<ApprovalDecisionProjection> = z.object({
+  approval: approvalProjectionSchema, work: workProjectionSchema,
+})
+const delegationProjectionSchema = z.object({
+  id: z.string(), workspace_id: z.string(), work_id: z.string(), source_node_id: z.string(), target_node_id: z.string().nullable(),
+  proposer_employee_id: z.string(), target_employee_id: z.string(), graph_revision_id: z.string(),
+  status: z.enum(['proposed', 'accepted', 'rejected', 'completed']), created_at: z.string(),
+})
+const delegationCollectionSchema: z.ZodType<DelegationCollection> = z.object({
+  delegations: z.array(delegationProjectionSchema), eligible_employees: z.array(employeeSummarySchema),
+})
+const delegationResultProjectionSchema: z.ZodType<DelegationResultProjection> = z.object({
+  delegation: delegationProjectionSchema, work: workProjectionSchema,
 })
 const errorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string(), correlation_id: z.string() }),
@@ -198,8 +234,36 @@ export class ProductApi {
     return this.request('POST', `/works/${encodeURIComponent(workId)}/cancel`, undefined, workProjectionSchema)
   }
 
+  replaceWorkspaceCapabilities(workspaceId: string, body: WorkspaceCapabilitiesUpdate): Promise<WorkspaceCapabilities> {
+    return this.request('PUT', `/workspaces/${encodeURIComponent(workspaceId)}/capabilities`, body, workspaceCapabilitiesSchema)
+  }
+
+  getWorkspaceCapabilities(workspaceId: string): Promise<WorkspaceCapabilities> {
+    return this.request('GET', `/workspaces/${encodeURIComponent(workspaceId)}/capabilities`, undefined, workspaceCapabilitiesSchema)
+  }
+
+  listApprovals(workspaceId: string): Promise<ApprovalProjection[]> {
+    return this.request('GET', `/workspaces/${encodeURIComponent(workspaceId)}/approvals`, undefined, z.array(approvalProjectionSchema))
+  }
+
+  approveApproval(approvalId: string, decidedBy: string): Promise<ApprovalDecisionProjection> {
+    return this.request('POST', `/approvals/${encodeURIComponent(approvalId)}/approve`, { decided_by: decidedBy }, approvalDecisionProjectionSchema)
+  }
+
+  rejectApproval(approvalId: string, decidedBy: string): Promise<ApprovalDecisionProjection> {
+    return this.request('POST', `/approvals/${encodeURIComponent(approvalId)}/reject`, { decided_by: decidedBy }, approvalDecisionProjectionSchema)
+  }
+
+  listDelegations(workId: string): Promise<DelegationCollection> {
+    return this.request('GET', `/works/${encodeURIComponent(workId)}/delegations`, undefined, delegationCollectionSchema)
+  }
+
+  createDelegation(workId: string, body: DelegationCreate): Promise<DelegationResultProjection> {
+    return this.request('POST', `/works/${encodeURIComponent(workId)}/delegations`, body, delegationResultProjectionSchema)
+  }
+
   private async request<T>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     path: CompanyRequestPath,
     body: unknown,
     schema: z.ZodType<T>,

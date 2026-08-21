@@ -16,11 +16,14 @@ export interface LoopbackTransport {
 }
 
 function resolveCompanyPath(baseUrl: string, method: string, path: string): string {
-  if (method !== 'GET' && method !== 'POST') throw new Error('method_not_allowed')
+  if (method !== 'GET' && method !== 'POST' && method !== 'PUT') throw new Error('method_not_allowed')
   const allowed = path === '/health'
     || path === '/workspaces'
     || /^\/workspaces\/[^/]+\/employees$/u.test(path)
+    || /^\/workspaces\/[^/]+\/(?:works|approvals|capabilities)$/u.test(path)
     || /^\/employees\/[^/]+(?:\/revisions)?$/u.test(path)
+    || /^\/works\/[^/]+(?:\/(?:events|cancel|delegations))?$/u.test(path)
+    || /^\/approvals\/[^/]+\/(?:approve|reject)$/u.test(path)
   if (!allowed) throw new Error('route_not_allowed')
 
   const base = new URL(baseUrl)

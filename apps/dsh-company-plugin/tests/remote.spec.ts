@@ -31,6 +31,13 @@ describe('Company loopback transport', () => {
     ['POST', '/workspaces/ws-1/employees'],
     ['GET', '/employees/emp-1'],
     ['POST', '/employees/emp-1/revisions'],
+    ['PUT', '/workspaces/ws-1/capabilities'],
+    ['GET', '/workspaces/ws-1/capabilities'],
+    ['GET', '/workspaces/ws-1/approvals'],
+    ['POST', '/approvals/approval-1/approve'],
+    ['POST', '/approvals/approval-1/reject'],
+    ['GET', '/works/work-1/delegations'],
+    ['POST', '/works/work-1/delegations'],
   ] as const)('allows %s %s from the generated company contract', async (method, path) => {
     const fetch = vi.fn(async () => new Response('{}', { status: 200 }))
     const remote = createLoopbackTransport({ baseUrl: 'http://127.0.0.1:43123', fetch })
@@ -39,7 +46,7 @@ describe('Company loopback transport', () => {
     expect(fetch).toHaveBeenCalledWith(`http://127.0.0.1:43123${path}`, expect.objectContaining({ method }))
   })
 
-  it('rejects routes outside the Phase 2 company contract synchronously', () => {
+  it('rejects routes outside the company contract synchronously', () => {
     const remote = createLoopbackTransport({ baseUrl: 'http://127.0.0.1:43123' })
 
     expect(() => remote.request(
@@ -47,7 +54,7 @@ describe('Company loopback transport', () => {
     )).toThrow('route_not_allowed')
   })
 
-  it('rejects methods outside the Phase 2 company contract synchronously', () => {
+  it('rejects methods outside the company contract synchronously', () => {
     const remote = createLoopbackTransport({ baseUrl: 'http://127.0.0.1:43123' })
 
     expect(() => remote.request({ method: 'DELETE' as 'GET', path: '/workspaces' })).toThrow('method_not_allowed')

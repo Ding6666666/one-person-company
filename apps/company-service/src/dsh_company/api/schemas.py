@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal, cast
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from dsh_company.application.ports import EmployeeRecord, WorkAggregate
 from dsh_company.domain.work import (
@@ -14,20 +14,26 @@ from dsh_company.domain.work import (
 )
 from dsh_company.domain.workspace import Workspace as DomainWorkspace
 
-Name = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
-]
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 Responsibility = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
 ]
-ModelName = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
-]
-Action = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
-]
+ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+Action = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 ResourceKind = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+BoundedResource = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+]
+OperatorName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+]
+DelegatedObjective = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+]
+DelegatedCriterion = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+]
 
 
 class WorkspaceCreate(BaseModel):
@@ -38,8 +44,110 @@ class GrantCreate(BaseModel):
     action: Action
     level: Literal[0, 1, 2, 3]
     resource_kind: ResourceKind
+    resource_values: list[BoundedResource] = Field(min_length=1)
+    requires_approval: bool
+
+
+class WorkspaceCapabilitiesUpdate(BaseModel):
+    grants: list[GrantCreate] = Field(max_length=8)
+
+    @model_validator(mode="after")
+    def validate_closed_catalog(self) -> "WorkspaceCapabilitiesUpdate":
+        from dsh_company.domain.policy import ACTION_LEVELS
+
+        actions = [grant.action for grant in self.grants]
+        if len(actions) != len(set(actions)):
+            raise ValueError("capability actions must be unique")
+        for grant in self.grants:
+            required = ACTION_LEVELS.get(grant.action)
+            if required is None or grant.level != int(required):
+                raise ValueError("capability action and level must match the closed catalog")
+        return self
+
+
+class WorkspaceGrant(BaseModel):
+    action: str
+    level: Literal[0, 1, 2, 3]
+    resource_kind: str
     resource_values: list[str]
     requires_approval: bool
+
+
+class WorkspaceCapabilities(BaseModel):
+    workspace_id: str
+    grants: list[WorkspaceGrant]
+
+
+class EmployeeSummary(BaseModel):
+    id: str
+    display_name: str
+
+
+class ApprovalProjection(BaseModel):
+    id: str
+    workspace_id: str
+    work_id: str
+    node_id: str
+    action: str
+    resources: list[str]
+    reason: str
+    status: Literal["pending", "approved", "rejected", "cancelled"]
+    requested_at: datetime
+    decided_at: datetime | None
+    decided_by: str | None
+    requesting_employee: EmployeeSummary
+
+
+class ApprovalDecision(BaseModel):
+    decided_by: OperatorName
+
+
+class ApprovalDecisionProjection(BaseModel):
+    approval: ApprovalProjection
+    work: "WorkProjection"
+
+
+class DelegationCreate(BaseModel):
+    source_node_id: NonBlank
+    proposer_employee_id: NonBlank
+    target_employee_id: NonBlank
+    objective: DelegatedObjective
+    acceptance_criteria: list[DelegatedCriterion] = Field(min_length=1, max_length=50)
+    required_actions: list[Action] = Field(min_length=1, max_length=8)
+    resource_values: list[BoundedResource] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def validate_actions(self) -> "DelegationCreate":
+        from dsh_company.domain.policy import ACTION_LEVELS
+
+        if any(action not in ACTION_LEVELS for action in self.required_actions):
+            raise ValueError("delegation actions must use the closed catalog")
+        if len(self.required_actions) != len(set(self.required_actions)):
+            raise ValueError("delegation actions must be unique")
+        return self
+
+
+class DelegationProjection(BaseModel):
+    id: str
+    workspace_id: str
+    work_id: str
+    source_node_id: str
+    target_node_id: str | None
+    proposer_employee_id: str
+    target_employee_id: str
+    graph_revision_id: str
+    status: Literal["proposed", "accepted", "rejected", "completed"]
+    created_at: datetime
+
+
+class DelegationResultProjection(BaseModel):
+    delegation: DelegationProjection
+    work: "WorkProjection"
+
+
+class DelegationCollection(BaseModel):
+    delegations: list[DelegationProjection]
+    eligible_employees: list[EmployeeSummary]
 
 
 class EmployeeCreate(BaseModel):

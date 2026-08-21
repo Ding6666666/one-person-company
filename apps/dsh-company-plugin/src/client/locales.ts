@@ -65,6 +65,17 @@ export const zh = {
   copyFailed: '无法复制结果引用',
   companyEvents: '公司事件',
   emptyEvents: '还没有公司事件',
+  approvalInbox: '审批箱', emptyApprovals: '没有待审批请求', requestingEmployee: '请求员工', approvalReason: '审批原因',
+  governance: '治理',
+  approve: '批准', reject: '拒绝', retry: '重试', governanceLoadFailed: '治理信息加载失败', governanceDecisionFailed: '审批失败',
+  workspaceCapabilities: '工作区能力', addCapability: '添加能力', removeCapability: '移除能力', saveCapabilities: '保存能力',
+  capabilityRequired: '请至少添加一项能力', capabilityInvalid: '能力配置无效', capabilitySaveFailed: '能力保存失败', capabilitySaved: '能力已保存',
+  capabilityFieldsInvalid: '请修正能力字段',
+  capabilityLoadFailed: '能力加载失败',
+  delegations: '委派', delegateTo: '委派给', delegatedObjective: '委派目标', delegatedCriteria: '委派验收标准', requiredActions: '所需动作',
+  delegate: '委派', delegationInvalid: '请完整填写委派信息', delegationDenied: '委派被拒绝', delegationAccepted: '已接受', delegationRejected: '已拒绝', delegationCompleted: '已完成', delegationProposed: '已提议',
+  delegationFieldsInvalid: '请修正委派字段', delegationSubmitFailed: '委派提交失败',
+  delegationSource: '委派来源', selectDelegationSource: '请选择运行中的节点', noRunningDelegationSource: '没有运行中的委派来源',
 } as const
 
 export const en: Record<keyof typeof zh, string> = {
@@ -132,6 +143,17 @@ export const en: Record<keyof typeof zh, string> = {
   copyFailed: 'Could not copy result reference',
   companyEvents: 'Company events',
   emptyEvents: 'No company events yet',
+  approvalInbox: 'Approval inbox', emptyApprovals: 'No pending approvals', requestingEmployee: 'Requesting employee', approvalReason: 'Reason',
+  governance: 'Governance',
+  approve: 'Approve', reject: 'Reject', retry: 'Retry', governanceLoadFailed: 'Could not load governance data', governanceDecisionFailed: 'Could not decide approval',
+  workspaceCapabilities: 'Workspace capabilities', addCapability: 'Add capability', removeCapability: 'Remove capability', saveCapabilities: 'Save capabilities',
+  capabilityRequired: 'Add at least one capability', capabilityInvalid: 'Capability configuration is invalid', capabilitySaveFailed: 'Could not save capabilities', capabilitySaved: 'Capabilities saved',
+  capabilityFieldsInvalid: 'Fix the capability fields',
+  capabilityLoadFailed: 'Could not load capabilities',
+  delegations: 'Delegations', delegateTo: 'Delegate to', delegatedObjective: 'Delegated objective', delegatedCriteria: 'Delegated acceptance criteria', requiredActions: 'Required actions',
+  delegate: 'Delegate', delegationInvalid: 'Complete every delegation field', delegationDenied: 'Delegation denied', delegationAccepted: 'Accepted', delegationRejected: 'Rejected', delegationCompleted: 'Completed', delegationProposed: 'Proposed',
+  delegationFieldsInvalid: 'Fix the delegation fields', delegationSubmitFailed: 'Could not submit delegation',
+  delegationSource: 'Delegation source', selectDelegationSource: 'Select a running node', noRunningDelegationSource: 'No running delegation source',
 }
 
 export type CompanyLocaleKey = keyof typeof zh

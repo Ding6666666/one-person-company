@@ -1,6 +1,6 @@
 import type { paths } from './contracts/generated/openapi.js'
 
-export type CompanyRequestMethod = 'GET' | 'POST'
+export type CompanyRequestMethod = 'GET' | 'POST' | 'PUT'
 type OpenApiPath = Extract<keyof paths, string>
 type MaterializePath<Path extends string> =
   Path extends `${infer Prefix}{${string}}${infer Suffix}`

@@ -21,6 +21,13 @@ class ResourceNotFoundError(Exception):
         super().__init__(f"{resource} not found")
 
 
+class ConflictError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(message)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ResourceNotFoundError)
     async def resource_not_found(_request: Request, error: ResourceNotFoundError) -> JSONResponse:
@@ -32,3 +39,14 @@ def install_error_handlers(app: FastAPI) -> None:
             )
         )
         return JSONResponse(status_code=404, content=envelope.model_dump())
+
+    @app.exception_handler(ConflictError)
+    async def conflict(_request: Request, error: ConflictError) -> JSONResponse:
+        envelope = ErrorEnvelope(
+            error=ErrorDetail(
+                code=error.code,
+                message=error.message,
+                correlation_id=uuid4().hex,
+            )
+        )
+        return JSONResponse(status_code=409, content=envelope.model_dump())

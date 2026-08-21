@@ -207,6 +207,12 @@ export class CompanyController {
     }
   }
 
+  applyAuthoritativeWork(work: WorkProjection): void {
+    if (this.current.selectedWorkId !== work.id) return
+    this.workRefreshGeneration += 1
+    this.replaceWork(work, { phase: 'ready', pending: false, error: undefined })
+  }
+
   private async refreshWork(workId: string): Promise<void> {
     const generation = ++this.workRefreshGeneration
     try {

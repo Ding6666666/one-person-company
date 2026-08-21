@@ -170,6 +170,18 @@ class ApprovalRepository:
         if result.rowcount == 0:
             raise ConcurrentApprovalDecision(str(approval.id))
 
+    def list_for_workspace(self, workspace_id: WorkspaceId) -> tuple[Approval, ...]:
+        rows = self._session.scalars(
+            select(ApprovalRow)
+            .where(ApprovalRow.workspace_id == workspace_id)
+            .order_by(ApprovalRow.requested_at, ApprovalRow.id)
+        )
+        return tuple(
+            approval
+            for row in rows
+            if (approval := self.get(ApprovalId(row.id))) is not None
+        )
+
 
 class DelegationRepository:
     def __init__(self, session: Session) -> None:
@@ -226,3 +238,15 @@ class DelegationRepository:
             )
         )
         return None if row is None else self.get(DelegationId(row.id))
+
+    def list_for_work(self, work_id: WorkId) -> tuple[Delegation, ...]:
+        rows = self._session.scalars(
+            select(DelegationRow)
+            .where(DelegationRow.work_id == work_id)
+            .order_by(DelegationRow.created_at, DelegationRow.id)
+        )
+        return tuple(
+            delegation
+            for row in rows
+            if (delegation := self.get(DelegationId(row.id))) is not None
+        )
