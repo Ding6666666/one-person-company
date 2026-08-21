@@ -20,6 +20,9 @@ dev = [
   "pytest==9.1.1",
   "ruff==0.15.4",
 ]
+evaluation = [
+  "maseval==0.5.1",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["apps/company-service/tests", "tests/system/tests"]
