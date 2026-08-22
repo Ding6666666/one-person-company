@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from dsh_company.capability_sources.contracts import CapabilityEntry as DomainEntry
@@ -50,9 +50,9 @@ class CapabilityImport(BaseModel):
     external_id: Annotated[str, Field(min_length=1, max_length=240)]
 
 
-@router.get("/capability-sources", response_model=list[CapabilitySourceView])
+@router.get("/capability-sources/{kind}", response_model=list[CapabilitySourceView])
 def list_sources(
-    request: Request, kind: Annotated[CapabilityKind, Query()]
+    request: Request, kind: CapabilityKind
 ) -> list[CapabilitySourceView]:
     return [
         CapabilitySourceView.from_domain(source)
@@ -60,9 +60,9 @@ def list_sources(
     ]
 
 
-@router.get("/capability-entries", response_model=list[CapabilityEntryView])
+@router.get("/capability-entries/{kind}", response_model=list[CapabilityEntryView])
 def list_entries(
-    request: Request, kind: Annotated[CapabilityKind, Query()]
+    request: Request, kind: CapabilityKind
 ) -> list[CapabilityEntryView]:
     return [
         CapabilityEntryView.from_domain(entry)

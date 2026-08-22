@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 
 def test_default_capability_catalog_is_truthfully_empty() -> None:
     with TestClient(create_app(assembly=ComponentAssembly())) as client:
-        assert client.get("/capability-sources?kind=skill").json() == []
-        assert client.get("/capability-entries?kind=tool").json() == []
+        assert client.get("/capability-sources/skill").json() == []
+        assert client.get("/capability-entries/tool").json() == []
 
 
 def test_unknown_capability_source_uses_stable_not_found_error() -> None:
