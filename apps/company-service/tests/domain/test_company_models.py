@@ -18,6 +18,11 @@ def test_employee_creation_freezes_revision_and_stable_dsh_identity() -> None:
         responsibility="撰写并校对新闻内容",
         runtime_profile="workspace_read",
         model="deepseek-v4-flash",
+        role_template_key="product-manager",
+        work_type="产品管理",
+        avatar_key="product-manager",
+        skill_refs=(),
+        tool_refs=(),
     )
 
     assert revision.revision_number == 1
@@ -25,6 +30,11 @@ def test_employee_creation_freezes_revision_and_stable_dsh_identity() -> None:
     assert binding.dsh_agent_id == "employee-emp-1"
     assert binding.dsh_session_id == "employee-emp-1"
     assert binding.memory_scope_id == "dsh-session:employee-emp-1"
+    assert revision.role_template_key == "product-manager"
+    assert revision.work_type == "产品管理"
+    assert revision.avatar_key == "product-manager"
+    assert revision.skill_refs == ()
+    assert revision.tool_refs == ()
 
 
 def test_default_tools_are_present_but_not_high_risk() -> None:

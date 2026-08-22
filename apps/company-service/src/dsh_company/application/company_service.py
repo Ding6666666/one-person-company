@@ -22,9 +22,7 @@ class CompanyService:
         self._id_factory = id_factory
 
     def create_workspace(self, command: CreateWorkspace) -> Workspace:
-        workspace = Workspace.create(
-            WorkspaceId(self._id_factory("workspace")), command.name
-        )
+        workspace = Workspace.create(WorkspaceId(self._id_factory("workspace")), command.name)
         with self._uow as uow:
             uow.workspaces.add(workspace)
             uow.commit()
@@ -41,6 +39,11 @@ class CompanyService:
                 responsibility=command.responsibility,
                 runtime_profile=command.runtime_profile,
                 model=command.model,
+                role_template_key=command.role_template_key,
+                work_type=command.work_type,
+                avatar_key=command.avatar_key,
+                skill_refs=command.skill_refs,
+                tool_refs=command.tool_refs,
             )
             grants = self._grant_snapshot(command.workspace_id, revision.id, command.grants)
             uow.employees.add(employee, revision, binding, grants)
@@ -63,13 +66,20 @@ class CompanyService:
                 runtime_profile=command.runtime_profile,
                 model=command.model,
                 created_at=datetime.now(UTC),
+                role_template_key=command.role_template_key or current.revision.role_template_key,
+                work_type=command.work_type or current.revision.work_type,
+                avatar_key=command.avatar_key or current.revision.avatar_key,
+                skill_refs=current.revision.skill_refs
+                if command.skill_refs is None
+                else command.skill_refs,
+                tool_refs=current.revision.tool_refs
+                if command.tool_refs is None
+                else command.tool_refs,
             )
             if not revision.responsibility:
                 raise ValueError("employee responsibility must not be blank")
             employee = replace(current.employee, current_revision_id=revision.id)
-            grants = self._grant_snapshot(
-                employee.workspace_id, revision.id, command.grants
-            )
+            grants = self._grant_snapshot(employee.workspace_id, revision.id, command.grants)
             uow.employees.revise(employee, revision, current.binding, grants)
             uow.commit()
             record = uow.employees.get(employee.id)

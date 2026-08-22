@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from .models import (
     CapabilityGrantRow,
     EmployeeAgentBindingRow,
+    EmployeeRevisionProfileRow,
     EmployeeRevisionRow,
     EmployeeRow,
     WorkspaceRow,
@@ -118,6 +119,15 @@ class EmployeeRepository:
             created_at=binding.created_at,
             employee=employee_row,
         )
+        profile_row = EmployeeRevisionProfileRow(
+            employee_revision_id=revision.id,
+            role_template_key=revision.role_template_key,
+            work_type=revision.work_type,
+            avatar_key=revision.avatar_key,
+            skill_refs_json=json.dumps(revision.skill_refs, ensure_ascii=False),
+            tool_refs_json=json.dumps(revision.tool_refs, ensure_ascii=False),
+            revision=revision_row,
+        )
         grant_rows = [
             CapabilityGrantRow(
                 id=grant.id,
@@ -131,7 +141,7 @@ class EmployeeRepository:
             )
             for grant in grants
         ]
-        self._session.add_all([employee_row, revision_row, binding_row, *grant_rows])
+        self._session.add_all([employee_row, revision_row, profile_row, binding_row, *grant_rows])
 
     def get(self, employee_id: EmployeeId) -> EmployeeRecord | None:
         employee_row = self._session.get(EmployeeRow, employee_id)
@@ -180,6 +190,15 @@ class EmployeeRepository:
             created_at=revision.created_at,
             employee=employee_row,
         )
+        profile_row = EmployeeRevisionProfileRow(
+            employee_revision_id=revision.id,
+            role_template_key=revision.role_template_key,
+            work_type=revision.work_type,
+            avatar_key=revision.avatar_key,
+            skill_refs_json=json.dumps(revision.skill_refs, ensure_ascii=False),
+            tool_refs_json=json.dumps(revision.tool_refs, ensure_ascii=False),
+            revision=revision_row,
+        )
         grant_rows = [
             CapabilityGrantRow(
                 id=grant.id,
@@ -194,7 +213,7 @@ class EmployeeRepository:
             for grant in grants
         ]
         employee_row.current_revision_id = revision.id
-        self._session.add_all([revision_row, *grant_rows])
+        self._session.add_all([revision_row, profile_row, *grant_rows])
 
     def _record(
         self,
@@ -212,6 +231,7 @@ class EmployeeRepository:
         )
         if revision_row is None or binding_row is None:
             raise RuntimeError("employee persistence record is incomplete")
+        profile_row = self._session.get(EmployeeRevisionProfileRow, revision_row.id)
         grant_rows = self._session.scalars(
             select(CapabilityGrantRow)
             .where(CapabilityGrantRow.employee_revision_id == revision_row.id)
@@ -234,6 +254,17 @@ class EmployeeRepository:
                 runtime_profile=revision_row.runtime_profile,
                 model=revision_row.model,
                 created_at=_from_sqlite_utc(revision_row.created_at),
+                role_template_key=(
+                    "custom" if profile_row is None else profile_row.role_template_key
+                ),
+                work_type="自定义工作" if profile_row is None else profile_row.work_type,
+                avatar_key="custom" if profile_row is None else profile_row.avatar_key,
+                skill_refs=(
+                    () if profile_row is None else tuple(json.loads(profile_row.skill_refs_json))
+                ),
+                tool_refs=(
+                    () if profile_row is None else tuple(json.loads(profile_row.tool_refs_json))
+                ),
             ),
             binding=EmployeeAgentBinding(
                 id=EmployeeAgentBindingId(binding_row.id),

@@ -57,6 +57,23 @@ class EmployeeRevisionRow(Base):
     created_at: Mapped[datetime] = mapped_column(nullable=False)
     employee: Mapped[EmployeeRow] = relationship(back_populates="revisions")
     grants: Mapped[list["CapabilityGrantRow"]] = relationship(back_populates="revision")
+    profile: Mapped["EmployeeRevisionProfileRow | None"] = relationship(
+        back_populates="revision", uselist=False
+    )
+
+
+class EmployeeRevisionProfileRow(Base):
+    __tablename__ = "employee_revision_profiles"
+
+    employee_revision_id: Mapped[str] = mapped_column(
+        ForeignKey("employee_revisions.id"), primary_key=True
+    )
+    role_template_key: Mapped[str] = mapped_column(String, nullable=False)
+    work_type: Mapped[str] = mapped_column(String, nullable=False)
+    avatar_key: Mapped[str] = mapped_column(String, nullable=False)
+    skill_refs_json: Mapped[str] = mapped_column(Text, nullable=False)
+    tool_refs_json: Mapped[str] = mapped_column(Text, nullable=False)
+    revision: Mapped[EmployeeRevisionRow] = relationship(back_populates="profile")
 
 
 class CapabilityGrantRow(Base):
@@ -135,9 +152,7 @@ class DelegationRow(Base):
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), nullable=False)
     work_id: Mapped[str] = mapped_column(ForeignKey("works.id"), nullable=False)
     source_node_id: Mapped[str] = mapped_column(ForeignKey("work_nodes.id"), nullable=False)
-    target_node_id: Mapped[str | None] = mapped_column(
-        ForeignKey("work_nodes.id"), nullable=True
-    )
+    target_node_id: Mapped[str | None] = mapped_column(ForeignKey("work_nodes.id"), nullable=True)
     proposer_employee_id: Mapped[str] = mapped_column(ForeignKey("employees.id"), nullable=False)
     target_employee_id: Mapped[str] = mapped_column(String, nullable=False)
     graph_revision_id: Mapped[str] = mapped_column(

@@ -26,6 +26,11 @@ class EmployeeRevision:
     runtime_profile: str
     model: str
     created_at: datetime
+    role_template_key: str = "custom"
+    work_type: str = "自定义工作"
+    avatar_key: str = "custom"
+    skill_refs: tuple[str, ...] = ()
+    tool_refs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +77,11 @@ class Employee:
         responsibility: str,
         runtime_profile: str,
         model: str,
+        role_template_key: str = "custom",
+        work_type: str = "自定义工作",
+        avatar_key: str = "custom",
+        skill_refs: tuple[str, ...] = (),
+        tool_refs: tuple[str, ...] = (),
     ) -> tuple["Employee", EmployeeRevision, EmployeeAgentBinding]:
         name = display_name.strip()
         duty = responsibility.strip()
@@ -86,6 +96,11 @@ class Employee:
             runtime_profile=runtime_profile,
             model=model,
             created_at=now,
+            role_template_key=role_template_key.strip(),
+            work_type=work_type.strip(),
+            avatar_key=avatar_key.strip(),
+            skill_refs=tuple(skill_refs),
+            tool_refs=tuple(tool_refs),
         )
         session_id = f"employee-{employee_id}"
         binding = EmployeeAgentBinding.create(

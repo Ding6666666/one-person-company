@@ -21,6 +21,10 @@ Responsibility = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
 ]
 ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+ProfileKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+CapabilityRef = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)
+]
 Action = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 ResourceKind = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -137,17 +141,27 @@ class DelegationCollection(BaseModel):
 
 class EmployeeCreate(BaseModel):
     display_name: Name
+    role_template_key: ProfileKey = "custom"
+    work_type: Name = "自定义工作"
+    avatar_key: ProfileKey = "custom"
     responsibility: Responsibility
     runtime_profile: Literal["workspace_read", "workspace_write", "network_denied"]
     model: ModelName
     grants: list[GrantCreate] = Field(default_factory=list)
+    skill_refs: list[CapabilityRef] = Field(default_factory=list, max_length=64)
+    tool_refs: list[CapabilityRef] = Field(default_factory=list, max_length=64)
 
 
 class EmployeeRevise(BaseModel):
+    role_template_key: ProfileKey | None = None
+    work_type: Name | None = None
+    avatar_key: ProfileKey | None = None
     responsibility: Responsibility
     runtime_profile: Literal["workspace_read", "workspace_write", "network_denied"]
     model: ModelName
     grants: list[GrantCreate] = Field(default_factory=list)
+    skill_refs: list[CapabilityRef] | None = Field(default=None, max_length=64)
+    tool_refs: list[CapabilityRef] | None = Field(default=None, max_length=64)
 
 
 class Workspace(BaseModel):
@@ -178,6 +192,11 @@ class EmployeeRevision(BaseModel):
     runtime_profile: str
     model: str
     created_at: datetime
+    role_template_key: str
+    work_type: str
+    avatar_key: str
+    skill_refs: list[str]
+    tool_refs: list[str]
 
 
 class EmployeeBinding(BaseModel):
@@ -220,6 +239,11 @@ class Employee(BaseModel):
                 runtime_profile=revision.runtime_profile,
                 model=revision.model,
                 created_at=revision.created_at,
+                role_template_key=revision.role_template_key,
+                work_type=revision.work_type,
+                avatar_key=revision.avatar_key,
+                skill_refs=list(revision.skill_refs),
+                tool_refs=list(revision.tool_refs),
             ),
             binding=EmployeeBinding(
                 id=binding.id,

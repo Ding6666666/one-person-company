@@ -16,9 +16,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     assembly = ComponentAssembly(
         uow_factory=lambda: SqlAlchemyUnitOfWork(engine),
     )
-    with TestClient(
-        create_app(assembly=assembly), raise_server_exceptions=False
-    ) as test_client:
+    with TestClient(create_app(assembly=assembly), raise_server_exceptions=False) as test_client:
         yield test_client
     engine.dispose()
 
@@ -26,9 +24,14 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
 def _employee_payload() -> dict[str, object]:
     return {
         "display_name": "编辑",
+        "role_template_key": "product-manager",
+        "work_type": "产品管理",
+        "avatar_key": "product-manager",
         "responsibility": "撰写内容",
         "runtime_profile": "workspace_read",
         "model": "deepseek-v4-flash",
+        "skill_refs": [],
+        "tool_refs": [],
         "grants": [],
     }
 
@@ -45,6 +48,17 @@ def test_create_workspace_and_employee_without_provider_credentials(
     assert workspace.status_code == 201
     assert employee.status_code == 201
     assert employee.json()["binding"]["dsh_session_id"].startswith("employee-")
+    assert (
+        employee.json()["revision"]
+        | {
+            "role_template_key": "product-manager",
+            "work_type": "产品管理",
+            "avatar_key": "product-manager",
+            "skill_refs": [],
+            "tool_refs": [],
+        }
+        == employee.json()["revision"]
+    )
 
 
 def test_non_work_request_validation_uses_fastapi_default_contract(
@@ -265,9 +279,7 @@ def test_transport_trims_valid_core_and_grant_fields(client: TestClient) -> None
     assert employee["display_name"] == "编辑"
     assert employee["revision"]["responsibility"] == "撰写内容"
     assert employee["revision"]["model"] == "deepseek-v4-flash"
-    explicit = next(
-        grant for grant in employee["grants"] if grant["action"] == "workspace.write"
-    )
+    explicit = next(grant for grant in employee["grants"] if grant["action"] == "workspace.write")
     assert explicit["resource_kind"] == "workspace"
 
 
@@ -395,7 +407,4 @@ def test_registered_plugin_action_is_valid_for_employee_grants(client: TestClien
     )
 
     assert response.status_code == 201
-    assert any(
-        grant["action"] == "content-studio.publish"
-        for grant in response.json()["grants"]
-    )
+    assert any(grant["action"] == "content-studio.publish" for grant in response.json()["grants"])

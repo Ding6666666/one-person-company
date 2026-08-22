@@ -26,6 +26,11 @@ class CreateEmployee:
     runtime_profile: str
     model: str
     grants: tuple[GrantInput, ...]
+    role_template_key: str = "custom"
+    work_type: str = "自定义工作"
+    avatar_key: str = "custom"
+    skill_refs: tuple[str, ...] = ()
+    tool_refs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,3 +40,8 @@ class ReviseEmployee:
     runtime_profile: str
     model: str
     grants: tuple[GrantInput, ...]
+    role_template_key: str | None = None
+    work_type: str | None = None
+    avatar_key: str | None = None
+    skill_refs: tuple[str, ...] | None = None
+    tool_refs: tuple[str, ...] | None = None

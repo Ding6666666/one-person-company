@@ -57,8 +57,7 @@ def _validate_grants(request: Request, items: list[GrantCreate]) -> None:
         )
     catalog = BusinessPluginRegistry(request.app.state.assembly.uow_factory).action_catalog()
     if any(
-        (required_level := catalog.level(item.action)) is None
-        or int(required_level) != item.level
+        (required_level := catalog.level(item.action)) is None or int(required_level) != item.level
         for item in items
     ):
         raise UnprocessableEntityError(
@@ -123,6 +122,11 @@ def create_employee(
                 runtime_profile=body.runtime_profile,
                 model=body.model,
                 grants=_grants(body.grants),
+                role_template_key=body.role_template_key,
+                work_type=body.work_type,
+                avatar_key=body.avatar_key,
+                skill_refs=tuple(body.skill_refs),
+                tool_refs=tuple(body.tool_refs),
             )
         )
     except LookupError as error:
@@ -181,6 +185,11 @@ def revise_employee(
                 runtime_profile=body.runtime_profile,
                 model=body.model,
                 grants=_grants(body.grants),
+                role_template_key=body.role_template_key,
+                work_type=body.work_type,
+                avatar_key=body.avatar_key,
+                skill_refs=None if body.skill_refs is None else tuple(body.skill_refs),
+                tool_refs=None if body.tool_refs is None else tuple(body.tool_refs),
             )
         )
     except LookupError as error:
