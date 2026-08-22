@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 
 const commands = [
+  ['git', 'submodule', 'update', '--init', '--recursive'],
   [
     'pnpm', '--dir', 'vendor/deepseek-harness', 'install', '--frozen-lockfile',
   ],
@@ -49,8 +50,12 @@ function run() {
   const pnpm = resolvePnpmInvocation()
   const environment = { ...process.env, CI: 'true' }
   for (const [command, ...arguments_] of commands) {
-    const invoked = command === 'node' ? process.execPath : pnpm.executable
-    const prefix = command === 'node' ? [] : pnpm.arguments
+    const invoked = command === 'node'
+      ? process.execPath
+      : command === 'pnpm'
+        ? pnpm.executable
+        : command
+    const prefix = command === 'pnpm' ? pnpm.arguments : []
     const result = spawnSync(invoked, [...prefix, ...arguments_], {
       stdio: 'inherit',
       shell: false,

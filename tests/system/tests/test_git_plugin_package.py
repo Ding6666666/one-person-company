@@ -68,6 +68,7 @@ def test_git_prepare_uses_the_reviewed_build_commands() -> None:
     result = run_node("tools/prepare-git-plugin.mjs", "--describe")
 
     assert json.loads(result.stdout) == [
+        ["git", "submodule", "update", "--init", "--recursive"],
         [
             "pnpm",
             "--dir",

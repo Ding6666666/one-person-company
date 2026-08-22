@@ -14,11 +14,11 @@ This repository publishes one DSH bundle from its root package: `@dsh/company-pl
 dsh plugin --profile web add github:Ding6666666/one-person-company
 ```
 
-The first command may fail because pnpm blocks build scripts from Git dependencies. DSH prints the exact profile directory and pnpm prints the exact package key. Edit that profile's `pnpm-workspace.yaml` and add the printed key; for this bundle it is expected to resolve as:
+The first command may fail because pnpm blocks build scripts from Git dependencies. DSH prints the exact profile directory and pnpm prints the exact package-and-Git-spec key. Edit that profile's `pnpm-workspace.yaml` and copy that key verbatim:
 
 ```yaml
 allowBuilds:
-  '@dsh/company-plugin': true
+  '<exact key printed by pnpm>': true
 ```
 
 Then repeat the install command. `allowBuilds` permits the package's `prepare` code to run on the operator's machine outside the agent sandbox. Review the source and prefer a fixed revision for repeatable installation:
@@ -27,7 +27,7 @@ Then repeat the install command. `allowBuilds` permits the package's `prepare` c
 dsh plugin --profile web add github:Ding6666666/one-person-company#<commit-sha>
 ```
 
-If pnpm prints a different exact key, use its printed key rather than guessing.
+The key includes `@dsh/company-plugin` and the resolved Git spec. Do not shorten or reconstruct it; use the exact line from the failed install.
 
 ## Update, inspect, and remove
 
