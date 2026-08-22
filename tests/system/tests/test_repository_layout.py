@@ -77,3 +77,37 @@ def test_reuse_document_records_both_source_commits() -> None:
 
     assert "2330adbb89cd72cba29f4ed17b70f37036fecaba" in reuse_document
     assert "2db6ebd58523d14dca278e366ea0eb40499702b9" in reuse_document
+
+
+def test_public_documentation_explains_the_dsh_plugin_workflow() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    installation = (ROOT / "docs/development/plugin-installation.md").read_text(
+        encoding="utf-8"
+    )
+    contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    security = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    combined = "\n".join((readme, installation, contributing, security))
+
+    install_command = (
+        "dsh plugin --profile web add "
+        "github:Ding6666666/one-person-company"
+    )
+    assert install_command in readme
+    assert install_command in installation
+    assert "allowBuilds:" in installation
+    assert "@dsh/company-plugin" in installation
+    assert "dsh plugin --profile web remove @dsh/company-plugin" in installation
+    assert "git clone --recurse-submodules" in contributing
+    assert "uv run python tools/check.py" in readme
+    for variable in (
+        "DSH_COMPANY_PYTHON",
+        "DSH_COMPANY_SERVICE_ROOT",
+        "DSH_COMPANY_DATA_ROOT",
+    ):
+        assert variable in readme
+        assert variable in installation
+    assert "runtime_process_lost" in readme
+    assert "approval_control_not_exposed" in readme
+    assert "github.com/Ding6666666/one-person-company" in combined
+    assert "github.com/your-name" not in combined
+    assert "github.com/OWNER" not in combined

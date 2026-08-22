@@ -5,15 +5,17 @@ Thank you for improving DSH Company. By participating, you agree to the
 
 ## Set up
 
-From the repository root, initialize the pinned DSH submodule and install the locked dependencies:
+Clone the public repository with its pinned DSH submodule, then install the locked dependencies:
 
-```powershell
-git submodule update --init --recursive
+```console
+git clone --recurse-submodules https://github.com/Ding6666666/one-person-company.git
+cd one-person-company
 uv sync --all-packages --all-groups
 pnpm --dir vendor/deepseek-harness install --frozen-lockfile
-pnpm --dir vendor/deepseek-harness run build:lib
 pnpm install --frozen-lockfile
 ```
+
+For an existing clone, `git submodule update --init --recursive` restores the pinned vendor tree.
 
 Use a short-lived, descriptive conventional branch such as `feat/<topic>`, `fix/<topic>`, or
 `docs/<topic>`.
@@ -22,11 +24,14 @@ Use a short-lived, descriptive conventional branch such as `feat/<topic>`, `fix/
 
 - `apps/company-service` contains the Python foundation service.
 - `apps/dsh-company-plugin` contains the DSH plugin shell.
+- `packages/company-plugin-sdk` contains the generated public TypeScript SDK.
 - `packages/contracts` owns the committed OpenAPI transport snapshot, compatibility fixtures, and
   contract tooling.
 - Generated TypeScript lives at
   `apps/dsh-company-plugin/src/contracts/generated/openapi.ts`; do not edit it by hand.
 - `vendor/deepseek-harness` is pinned upstream source; do not edit it as part of application changes.
+- The repository root is the publishable `@dsh/company-plugin` bundle; keep its exports, Cordis patch,
+  package file list, and Git `prepare` path aligned.
 
 Keep changes focused and do not commit generated dependencies or local application data. Follow
 the [contract ownership rules](docs/development/contracts.md) when changing the service API.
@@ -58,3 +63,6 @@ Never commit credentials or place them in `.env`, tests, fixtures, logs, screens
 documentation. Pull requests should explain intent, user-visible effects, tests, compatibility
 impact, and any remaining risk. Keep unrelated changes out and update public documentation when
 behavior changes.
+
+Open issues and pull requests at
+[Ding6666666/one-person-company](https://github.com/Ding6666666/one-person-company).

@@ -6,8 +6,9 @@ Until the first release, security fixes are applied to the latest commit on the 
 
 ## Private reporting
 
-Report vulnerabilities privately with the repository's **Security → Report a vulnerability**
-GitHub Security Advisory form. Do not open a public issue or discussion. Include the affected
+Report vulnerabilities privately with the repository's
+[Security Advisory form](https://github.com/Ding6666666/one-person-company/security/advisories/new).
+Do not open a public issue or discussion. Include the affected
 revision, impact, reproduction steps, and a minimal proof of concept without confidential data.
 Please allow maintainers time to investigate and coordinate disclosure.
 

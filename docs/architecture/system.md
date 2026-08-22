@@ -1,6 +1,6 @@
 # DSH Company 系统架构
 
-**状态：** 设计已确认，2026-08-21，进入分阶段实施计划。
+**状态：** 已实现并由公开无密钥门禁持续验证。
 
 本文定义第一阶段 Company Core 的组件、依赖方向、权威数据源和运行边界。产品语义以[产品方向](../product/one-person-company-product-direction.md)为准；工作图和评测细节见[图编排与评测](orchestration-and-evaluation.md)。
 
@@ -58,7 +58,7 @@ DSH Company 是一人公司的组织与协作控制层。它把长期存在、�
 第三方 Memory Provider 通过 DSH 接入；业务插件通过 Company Core 的公开扩展边界接入。
 ```
 
-第一阶段沿用已验证的本地插件部署模式：TypeScript Host 只负责 Company Service 的生命周期、凭据边界和 loopback 连接；Python Service 负责公司业务状态和 DSH Gateway。Host 不保存业务事实。
+仓库根目录按 DSH bundle 约定发布为 `@dsh/company-plugin`。`cordis.patch.yml` 把 TypeScript Host/Client 组合进目标 profile；Git 安装期间的 `prepare` 构建双端入口和固定 DSH Node carrier。TypeScript Host 只负责 Company Service 的生命周期、凭据边界、carrier 解压和 loopback 连接；Python Service 负责公司业务状态和 DSH Gateway。Host 不保存业务事实。
 
 ## 4. 组件与依赖方向
 
@@ -203,7 +203,7 @@ Workspace 上限
 - OpenAPI 作为 Python/TypeScript 传输契约；
 - Pytest、Vitest、Pyright、Ruff 和生产构建作为门禁。
 
-目标布局：
+公开仓库布局：
 
 ```text
 apps/
@@ -219,9 +219,16 @@ apps/
       foundation/
   dsh-company-plugin/
 packages/
+  company-plugin-sdk/
   contracts/
+benchmarks/company/
 docs/
+evaluation/
 tests/system/
+tools/
+vendor/deepseek-harness/
 ```
+
+根 `package.json`、根 `cordis.patch.yml` 与 `tools/prepare-git-plugin.mjs` 共同构成 DSH 安装边界。`vendor/deepseek-harness` 是固定 Git submodule；Company 不复制或修改其私有实现。当前公开树不包含本地实施计划、运行数据库、日志、凭据或构建依赖目录。
 
 代码复用必须遵循[`multi-agent` 复用策略](../development/multi-agent-reuse.md)，不得把旧软件领域模型作为新 Core 的起点。

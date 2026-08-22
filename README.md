@@ -1,91 +1,105 @@
-# DSH Company
+# One Person Company for DSH
 
-DSH Company is an independent open-source project built on DSH. The repository now contains the
-Phase 1 engineering foundation and public DSH capability evidence, the Phase 2 Company Core, the
-Phase 3 Direct Work loop, Phase 4 governance, and Phase 5 durable Work Graph and
-business-plugin boundaries:
-Workspace and Employee domain models, immutable Employee revisions, capability grants, stable DSH
-bindings, SQLite persistence, loopback APIs, direct execution/history/cancellation, and the
-management UI. Governance adds four-layer capability intersection, operator approvals, immutable
-delegation revisions, and bounded same-Workspace employee delegation.
-Phase 5 adds Direct, Star, explicit Graph, and Battle strategies on the same
-durable engine, a fixed keyless evaluation set, and declarative namespaced
-business plugins that use only public Company endpoints.
+One Person Company is an open-source [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) plugin for running a durable, governed company of AI employees. It adds Company workspaces, versioned employees, Direct/Star/Graph/Battle work strategies, approvals, delegation, history, and declarative business plugins while leaving agent execution, sessions, tools, skills, connectors, and personal memory under DSH authority.
 
-## Repository setup
+The repository root is the installable DSH bundle (`@dsh/company-plugin`). The TypeScript Host starts the loopback Company Service, the React Client renders authoritative projections, and the Python service owns Company facts in SQLite. Company stores safe lifecycle facts and artifact references; it does not copy model transcripts, tool arguments, prompts, or final responses into its database.
 
-Run these commands from the repository root. They initialize the pinned upstream DSH source and
-install the locked Python, upstream DSH, and workspace JavaScript dependencies:
+## Requirements
 
-```powershell
-git submodule update --init --recursive
+- DSH with the `dsh` CLI available on `PATH`.
+- Node.js 22.19 or newer and pnpm 11 or newer.
+- Python 3.13 and [uv](https://docs.astral.sh/uv/).
+- Windows uses DSH's supported Node carrier. Other supported DSH platforms use the same packaged carrier contract.
+
+## Install as a DSH plugin
+
+Install the source-hosted bundle into the `web` profile:
+
+```console
+dsh plugin --profile web add github:Ding6666666/one-person-company
+```
+
+Git-hosted DSH plugins build from source through their `prepare` script. pnpm 10 and newer blocks that script until the profile explicitly allows it. On the first attempt, copy the exact package key printed by pnpm into the profile's `pnpm-workspace.yaml` under `allowBuilds`, then run the same command again. This grants trusted install-time code execution outside the agent sandbox. Pin a reviewed commit when reproducibility matters:
+
+```console
+dsh plugin --profile web add github:Ding6666666/one-person-company#<commit-sha>
+```
+
+See [Plugin installation](docs/development/plugin-installation.md) for the exact allow, update, remove, local checkout, data, and troubleshooting workflow.
+
+## Configuration and data
+
+The bundle works without path overrides. It runs the packaged Company Service with uv and stores its environment and SQLite database beneath the profile-owned Company data directory. These optional environment variables override the package defaults:
+
+| Variable | Purpose |
+|---|---|
+| `DSH_COMPANY_PYTHON` | Use an explicit Python executable instead of packaged uv launch. |
+| `DSH_COMPANY_SERVICE_ROOT` | Use an alternate Company Service directory. |
+| `DSH_COMPANY_DATA_ROOT` | Choose the persistent Company data root. |
+
+Creating workspaces and employees is local and does not start DSH or require a provider credential. When work is dispatched, the Host passes only the selected DSH credential to the loopback child process. Do not commit `.env` files, databases, logs, profile data, or credentials.
+
+## Capabilities
+
+- Durable Workspace, Employee, immutable EmployeeRevision, binding, Work, Attempt, graph, approval, delegation, event, and artifact-reference facts.
+- Direct, Star, explicit Graph, and Battle strategies on a SQLite-backed orchestration engine.
+- Four-layer Company authorization: Workspace, Employee revision, Work Node, and DSH Runtime Profile.
+- Approval persisted before dispatch and rechecked against current policy after approval.
+- Same-Workspace bounded delegation with immutable graph revisions and artifact-reference-only return.
+- Public REST/OpenAPI surface, generated TypeScript SDK, Host/Client plugin, and accessible management UI.
+- Declarative Company business-plugin catalog and templates. These extend Company policy facts; they are not dynamically injected DSH tools, skills, or connectors.
+- Fixed keyless system evaluation across seven task families and fourteen task/strategy pairs.
+
+## Repository structure
+
+```text
+apps/
+  company-service/          Python Company API, domain, persistence and orchestration
+  dsh-company-plugin/       DSH Host lifecycle and React Client
+packages/
+  company-plugin-sdk/       Generated public TypeScript SDK
+  contracts/                OpenAPI snapshot, provenance and generators
+benchmarks/company/         Safe fixed-set tasks and baseline metrics
+docs/                       Product, architecture and development documentation
+evaluation/                 MASEval adapter and fixed evaluation runner
+tests/system/               Keyless cross-component acceptance tests
+tools/                      Public verification and git-package tooling
+vendor/deepseek-harness/    Pinned DSH Git submodule
+```
+
+The main architecture map is in [System architecture](docs/architecture/system.md), and [the documentation index](docs/README.md) routes to product and development references.
+
+## Develop from source
+
+```console
+git clone --recurse-submodules https://github.com/Ding6666666/one-person-company.git
+cd one-person-company
 uv sync --all-packages --all-groups
 pnpm --dir vendor/deepseek-harness install --frozen-lockfile
-pnpm --dir vendor/deepseek-harness run build:lib
 pnpm install --frozen-lockfile
 ```
 
-## Verify and run
+Run the complete public keyless gate:
 
-Run the same public, keyless gate used by CI from the repository root after dependency setup:
-
-```powershell
+```console
 uv run python tools/check.py
 ```
 
-When the repository's Python 3.13 uv environment is activated or its executable directory is on
-`PATH`, as in CI, the equivalent invocation is `python tools/check.py`. On Windows, use the
-`uv run` form unless that environment is already active so `python` does not resolve to the
-Microsoft Store alias.
+The gate checks the Python lock, Ruff, Pyright, pinned DSH builds and runtime, Company system scenarios, evaluation, migrations, OpenAPI contracts, Host/Client builds and tests, and SDK builds/tests. It uses a loopback keyless endpoint and does not require or read a real provider key.
 
-Start the foundation service locally with:
+See [Contributing](CONTRIBUTING.md) for focused commands and contract ownership.
 
-```powershell
-uv run uvicorn dsh_company.asgi:app --host 127.0.0.1 --port 8000
-```
+## Verified DSH limits
 
-The service exposes `/health` together with Workspace, Employee, Work, event-history,
-cancellation, Workspace capability, approval, delegation, business-plugin, and
-template-instantiation endpoints. When the
-DSH Host starts it, Company data is stored in `company.db` beneath `DSH_COMPANY_DATA_ROOT` and is
-recovered after a service restart. Creating a Workspace or Employee is entirely local: it neither
-requires provider credentials nor starts DSH. Direct Work starts one Attempt-owned public DSH
-Harness; the Host passes the selected DeepSeek credential explicitly to the child service. Company
-stores only authoritative lifecycle facts, safe event projections, and a `dsh-session://` artifact
-reference—not the raw transcript, tool arguments, or final model text.
+- The fixed public DSH SDK does not expose cross-process cold Session resume. A running attempt found after restart is recorded as `blocked/runtime_process_lost`; Company does not fabricate Memory or resume semantics.
+- A DSH-produced approval control request cannot truthfully continue an already-running attempt with the public SDK, so it closes as `approval_control_not_exposed`. Operators decide persisted pre-dispatch approvals through Company APIs/UI.
+- Runtime Profiles do not expose `external.publish`; approval cannot create an unavailable runtime capability.
+- Company business-plugin actions remain policy/catalog facts and do not become DSH tools automatically.
 
-The public gate runs the fixed DSH runtime against a local keyless model endpoint before the full
-service, contract, and plugin checks. It does not read or forward a Provider credential.
+The evidence and exact product consequences are recorded in the [DSH capability matrix](docs/development/dsh-capability-matrix.md) and [strategy selection](docs/development/strategy-selection.md).
 
-Every governed action requires a matching Workspace grant, immutable Employee revision grant,
-Work Node grant, and Runtime Profile allowance. An approval is persisted before dispatch, and an
-approved action is checked again against the current grants. The fixed Runtime Profiles do not
-expose `external.publish`, so approval cannot expand that unavailable DSH capability. The Phase 4
-keyless acceptance therefore exercises the same approval boundary with an explicitly
-`requires_approval` L2 `workspace.write` grant instead of inventing an L3 runtime path.
+## Security and license
 
-The public DSH control path accepts only complete, standalone delegation JSON and then validates it
-against Company facts. It can create a same-Workspace child revision and Attempt, but model output
-is never authority by itself and raw output is not stored or returned by Company APIs. Approval
-control from DSH remains explicitly unavailable as `approval_control_not_exposed`; operators decide
-persisted approvals through the Company API. A completed delegated child contributes only its
-`ArtifactReferenceId` to a new parent Attempt.
+Report vulnerabilities through the repository's [private security advisory form](https://github.com/Ding6666666/one-person-company/security/advisories/new). See [SECURITY.md](SECURITY.md) for the policy.
 
-The fixed public DSH SDK does not expose cold Session resume. Employee bindings therefore remain
-stable Company facts across restart, but they must not be interpreted as proof that a stopped DSH
-runtime can resume its former live Session. See the
-[DSH capability matrix](docs/development/dsh-capability-matrix.md) for the verified boundary.
-The same limitation is visible in Direct Work: after one Attempt closes its Harness, another Work
-bound to the same Session ID returns the SDK's closed error result before a second model request.
-Company records `failed/gateway_error`; it does not report completion or construct substitute
-Memory/resume behavior. A running Attempt found after service restart is instead recorded as
-`blocked/runtime_process_lost`.
-
-The fixed strategy baseline and adoption rule are documented in
-[strategy selection](docs/development/strategy-selection.md). Direct remains the
-global default; no aggregate benchmark score silently changes strategy. Baseline
-artifacts retain only safe system metrics and never model text or checksums.
-
-See [the documentation index](docs/README.md), [CONTRIBUTING.md](CONTRIBUTING.md) for contribution
-guidelines, and [SECURITY.md](SECURITY.md) for private vulnerability reporting. Licensed under the
-[Apache License 2.0](LICENSE).
+Licensed under the [Apache License 2.0](LICENSE).
