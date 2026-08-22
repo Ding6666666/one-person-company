@@ -44,6 +44,20 @@ def test_dsh_submodule_uses_the_pinned_vendor_location() -> None:
     assert "url = https://github.com/Ding6666666/deepseek-harness.git" in gitmodules
 
 
+def test_public_tree_excludes_private_plans_and_runtime_artifacts() -> None:
+    assert not (ROOT / "docs/superpowers/plans").exists()
+    ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    for entry in (
+        ".env",
+        ".env.*",
+        "**/.venv/",
+        "**/node_modules/",
+        "dsh-company-data/",
+        "*.log",
+    ):
+        assert entry in ignored
+
+
 def test_reuse_document_records_both_source_commits() -> None:
     reuse_document = (ROOT / "docs/development/multi-agent-reuse.md").read_text(
         encoding="utf-8"

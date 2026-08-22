@@ -25,3 +25,5 @@ dsh-company.db
 dsh-company.db-shm
 dsh-company.db-wal
 dsh-company-data/
+*.log
+docs/superpowers/plans/
