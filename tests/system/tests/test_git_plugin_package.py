@@ -124,6 +124,34 @@ def test_git_prepare_resolves_pnpm_without_a_windows_command_shim() -> None:
         assert invocation == {"executable": "pnpm", "arguments": []}
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows pnpm action layout")
+def test_git_prepare_resolves_pnpm_from_the_action_bin_layout(
+    tmp_path: Path,
+) -> None:
+    node = shutil.which("node")
+    assert node is not None
+    action_root = tmp_path / "setup-pnpm" / "node_modules"
+    action_bin = action_root / ".bin"
+    pnpm_entry = action_root / "pnpm" / "bin" / "pnpm.mjs"
+    action_bin.mkdir(parents=True)
+    pnpm_entry.parent.mkdir(parents=True)
+    pnpm_entry.write_text("", encoding="utf-8")
+    environment = {**os.environ, "PATH": str(action_bin)}
+    environment.pop("npm_execpath", None)
+
+    result = subprocess.run(
+        [node, "tools/prepare-git-plugin.mjs", "--resolve-pnpm"],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    invocation = json.loads(result.stdout)
+    assert Path(invocation["arguments"][0]) == pnpm_entry
+
+
 def test_packed_root_contains_the_plugin_and_company_runtime(tmp_path: Path) -> None:
     pnpm = shutil.which("pnpm")
     assert pnpm is not None

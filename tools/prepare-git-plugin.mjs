@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { delimiter, join } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 
 const commands = [
   ['git', 'submodule', 'update', '--init', '--recursive'],
@@ -38,9 +38,14 @@ function resolvePnpmInvocation() {
   }
 
   for (const directory of (process.env.PATH ?? '').split(delimiter)) {
-    const candidate = join(directory, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
-    if (existsSync(candidate)) {
-      return { executable: process.execPath, arguments: [candidate] }
+    const candidates = [
+      join(directory, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'),
+      resolve(directory, '..', 'pnpm', 'bin', 'pnpm.mjs'),
+    ]
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) {
+        return { executable: process.execPath, arguments: [candidate] }
+      }
     }
   }
   throw new Error('the pnpm JavaScript entry point was not found on PATH')
