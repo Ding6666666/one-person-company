@@ -56,6 +56,12 @@ def test_dsh_submodule_uses_the_pinned_vendor_location() -> None:
     assert "url = https://github.com/Ding6666666/deepseek-harness.git" in gitmodules
 
 
+def test_ci_fetches_the_history_required_by_contract_provenance() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert "fetch-depth: 0" in workflow
+
+
 def test_public_tree_excludes_private_plans_and_runtime_artifacts() -> None:
     assert not (ROOT / "docs/superpowers/plans").exists()
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
