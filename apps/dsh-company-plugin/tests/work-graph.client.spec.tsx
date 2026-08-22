@@ -32,6 +32,11 @@ const employee = (index: number): Employee => ({
     runtime_profile: 'workspace_read',
     model: 'deepseek-chat',
     created_at: now,
+    role_template_key: 'custom',
+    work_type: '自定义工作',
+    avatar_key: 'custom',
+    skill_refs: [],
+    tool_refs: [],
   },
   binding: {
     id: `binding-${index}`,

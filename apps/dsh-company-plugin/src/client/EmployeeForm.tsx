@@ -104,10 +104,15 @@ export function EmployeeForm({ pending, onCancel, onSave, t }: {
         }))
     await onSave({
       display_name: parsed.data.displayName,
+      role_template_key: 'custom',
+      work_type: '自定义工作',
+      avatar_key: 'custom',
       responsibility: parsed.data.responsibility,
       runtime_profile: runtimeProfile,
       model: parsed.data.model,
       grants: explicit,
+      skill_refs: [],
+      tool_refs: [],
     })
   }
 

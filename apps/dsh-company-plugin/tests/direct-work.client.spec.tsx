@@ -30,6 +30,7 @@ const employee: Schemas['Employee'] = {
   revision: {
     id: 'rev-1', employee_id: 'emp-1', revision_number: 1, responsibility: '撰写内容',
     runtime_profile: 'workspace_read', model: 'deepseek-chat', created_at: now,
+    role_template_key: 'custom', work_type: '自定义工作', avatar_key: 'custom', skill_refs: [], tool_refs: [],
   },
   binding: {
     id: 'binding-1', employee_id: 'emp-1', dsh_agent_id: 'employee-emp-1',

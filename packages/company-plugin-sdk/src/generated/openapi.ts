@@ -89,6 +89,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/capability-entries/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Entries */
+        get: operations["list_entries_capability_entries__kind__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/capability-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Entry */
+        post: operations["import_entry_capability_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/capability-sources/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources */
+        get: operations["list_sources_capability_sources__kind__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/employees/{employee_id}": {
         parameters: {
             query?: never;
@@ -132,6 +183,23 @@ export interface paths {
         };
         /** Health */
         get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runtime-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Runtime Options */
+        get: operations["runtime_options_runtime_options_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -466,11 +534,55 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** CapabilityEntryView */
+        CapabilityEntryView: {
+            /** Description */
+            description: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "tool";
+            /** Name */
+            name: string;
+            /** Ref */
+            ref: string;
+            /** Required Actions */
+            required_actions: string[];
+            /** Source Id */
+            source_id: string;
+            /** Version */
+            version: string;
+        };
+        /** CapabilityImport */
+        CapabilityImport: {
+            /** External Id */
+            external_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "tool";
+            /** Source Id */
+            source_id: string;
+        };
         /**
          * CapabilityLevel
          * @enum {integer}
          */
         CapabilityLevel: 0 | 1 | 2 | 3;
+        /** CapabilitySourceView */
+        CapabilitySourceView: {
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "skill" | "tool";
+        };
         /** CompanyEvent */
         CompanyEvent: {
             /** Attempt Id */
@@ -627,6 +739,11 @@ export interface components {
         };
         /** EmployeeCreate */
         EmployeeCreate: {
+            /**
+             * Avatar Key
+             * @default custom
+             */
+            avatar_key: string;
             /** Display Name */
             display_name: string;
             /** Grants */
@@ -636,27 +753,53 @@ export interface components {
             /** Responsibility */
             responsibility: string;
             /**
+             * Role Template Key
+             * @default custom
+             */
+            role_template_key: string;
+            /**
              * Runtime Profile
              * @enum {string}
              */
             runtime_profile: "workspace_read" | "workspace_write" | "network_denied";
+            /** Skill Refs */
+            skill_refs?: string[];
+            /** Tool Refs */
+            tool_refs?: string[];
+            /**
+             * Work Type
+             * @default �Զ��幤��
+             */
+            work_type: string;
         };
         /** EmployeeRevise */
         EmployeeRevise: {
+            /** Avatar Key */
+            avatar_key?: string | null;
             /** Grants */
             grants?: components["schemas"]["GrantCreate"][];
             /** Model */
             model: string;
             /** Responsibility */
             responsibility: string;
+            /** Role Template Key */
+            role_template_key?: string | null;
             /**
              * Runtime Profile
              * @enum {string}
              */
             runtime_profile: "workspace_read" | "workspace_write" | "network_denied";
+            /** Skill Refs */
+            skill_refs?: string[] | null;
+            /** Tool Refs */
+            tool_refs?: string[] | null;
+            /** Work Type */
+            work_type?: string | null;
         };
         /** EmployeeRevision */
         EmployeeRevision: {
+            /** Avatar Key */
+            avatar_key: string;
             /**
              * Created At
              * Format: date-time
@@ -672,8 +815,16 @@ export interface components {
             responsibility: string;
             /** Revision Number */
             revision_number: number;
+            /** Role Template Key */
+            role_template_key: string;
             /** Runtime Profile */
             runtime_profile: string;
+            /** Skill Refs */
+            skill_refs: string[];
+            /** Tool Refs */
+            tool_refs: string[];
+            /** Work Type */
+            work_type: string;
         };
         /** EmployeeSlot */
         EmployeeSlot: {
@@ -833,6 +984,13 @@ export interface components {
              * @default []
              */
             runtime_profiles: ("workspace_read" | "workspace_write" | "network_denied")[];
+        };
+        /** RuntimeOptions */
+        RuntimeOptions: {
+            /** Default Model */
+            default_model: string;
+            /** Provider */
+            provider: string;
         };
         /** StarChildInput */
         StarChildInput: {
@@ -1299,6 +1457,101 @@ export interface operations {
             };
         };
     };
+    list_entries_capability_entries__kind__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "skill" | "tool";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityEntryView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_entry_capability_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CapabilityImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityEntryView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_capability_sources__kind__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "skill" | "tool";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilitySourceView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_employee_employees__employee_id__get: {
         parameters: {
             query?: never;
@@ -1399,6 +1652,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    runtime_options_runtime_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeOptions"];
                 };
             };
         };

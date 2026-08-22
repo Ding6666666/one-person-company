@@ -34,6 +34,11 @@ function employee(workspaceId: string, id: string, displayName: string): Schemas
       runtime_profile: 'workspace_read',
       model: 'deepseek-v4-flash',
       created_at: now,
+      role_template_key: 'custom',
+      work_type: '自定义工作',
+      avatar_key: 'custom',
+      skill_refs: [],
+      tool_refs: [],
     },
     binding: {
       id: `binding-${id}`,
@@ -135,6 +140,11 @@ class FakeCompanyRemote implements CompanyRemoteNamespace {
           runtime_profile: body.runtime_profile,
           model: body.model,
           created_at: now,
+          role_template_key: body.role_template_key,
+          work_type: body.work_type,
+          avatar_key: body.avatar_key,
+          skill_refs: body.skill_refs ?? [],
+          tool_refs: body.tool_refs ?? [],
         },
         binding: {
           id: `binding-${id}`,
@@ -179,7 +189,8 @@ describe('Company core client', () => {
     await selectA
 
     const createA = controller.createEmployee({
-      display_name: 'A', responsibility: 'Write', runtime_profile: 'workspace_read', model: 'deepseek-v4-flash', grants: [],
+      display_name: 'A', role_template_key: 'custom', work_type: '自定义工作', avatar_key: 'custom',
+      responsibility: 'Write', runtime_profile: 'workspace_read', model: 'deepseek-v4-flash', grants: [],
     })
     const selectB = controller.selectWorkspace('ws-b')
     remote.respond('GET', '/workspaces/ws-b/employees', [employee('ws-b', 'emp-b', 'B')])

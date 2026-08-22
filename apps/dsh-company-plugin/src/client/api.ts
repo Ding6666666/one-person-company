@@ -34,6 +34,10 @@ export type ApprovalDecisionProjection = ApiSchemas['ApprovalDecisionProjection'
 export type DelegationCreate = ApiSchemas['DelegationCreate']
 export type DelegationCollection = ApiSchemas['DelegationCollection']
 export type DelegationResultProjection = ApiSchemas['DelegationResultProjection']
+export type CapabilitySourceView = ApiSchemas['CapabilitySourceView']
+export type CapabilityEntryView = ApiSchemas['CapabilityEntryView']
+export type CapabilityImport = ApiSchemas['CapabilityImport']
+export type RuntimeOptions = ApiSchemas['RuntimeOptions']
 
 const workspaceSchema: z.ZodType<Workspace> = z.object({
   id: z.string(),
@@ -57,6 +61,11 @@ const revisionSchema = z.object({
   runtime_profile: z.string(),
   model: z.string(),
   created_at: z.string(),
+  role_template_key: z.string(),
+  work_type: z.string(),
+  avatar_key: z.string(),
+  skill_refs: z.array(z.string()),
+  tool_refs: z.array(z.string()),
 })
 const bindingSchema = z.object({
   id: z.string(),
@@ -169,6 +178,16 @@ const delegationResultProjectionSchema: z.ZodType<DelegationResultProjection> = 
 const errorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string(), correlation_id: z.string() }),
 })
+const capabilitySourceSchema: z.ZodType<CapabilitySourceView> = z.object({
+  id: z.string(), kind: z.enum(['skill', 'tool']), display_name: z.string(),
+})
+const capabilityEntrySchema: z.ZodType<CapabilityEntryView> = z.object({
+  ref: z.string(), source_id: z.string(), kind: z.enum(['skill', 'tool']), name: z.string(),
+  description: z.string(), version: z.string(), required_actions: z.array(z.string()),
+})
+const runtimeOptionsSchema: z.ZodType<RuntimeOptions> = z.object({
+  provider: z.string(), default_model: z.string(),
+})
 
 export class ApiError extends Error {
   constructor(
@@ -209,6 +228,22 @@ export class ProductApi {
       body,
       employeeSchema,
     )
+  }
+
+  listCapabilitySources(kind: 'skill' | 'tool'): Promise<CapabilitySourceView[]> {
+    return this.request('GET', `/capability-sources/${kind}`, undefined, z.array(capabilitySourceSchema))
+  }
+
+  listCapabilityEntries(kind: 'skill' | 'tool'): Promise<CapabilityEntryView[]> {
+    return this.request('GET', `/capability-entries/${kind}`, undefined, z.array(capabilityEntrySchema))
+  }
+
+  importCapability(body: CapabilityImport): Promise<CapabilityEntryView> {
+    return this.request('POST', '/capability-imports', body, capabilityEntrySchema)
+  }
+
+  getRuntimeOptions(): Promise<RuntimeOptions> {
+    return this.request('GET', '/runtime-options', undefined, runtimeOptionsSchema)
   }
 
   listWorks(workspaceId: string): Promise<WorkProjection[]> {
