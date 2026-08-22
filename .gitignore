@@ -12,6 +12,7 @@
 **/node_modules/
 apps/dsh-company-plugin/dist/
 apps/dsh-company-plugin/lib/
+artifacts/
 packages/company-plugin-sdk/dist/
 packages/company-plugin-sdk/lib/
 .coverage

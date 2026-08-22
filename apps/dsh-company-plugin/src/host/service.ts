@@ -8,6 +8,7 @@ import type { Config } from './config.js'
 import { resolveHostConfig } from './config.js'
 import { CompanyHostLifecycle } from './lifecycle.js'
 import { CompanyPluginService } from './plugin.js'
+import { ensurePackagedRuntime } from './runtime.js'
 
 const CREDENTIAL_REF = credentialRef('DEEPSEEK_API_KEY')
 const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
@@ -36,6 +37,10 @@ export class CompanyHostService extends TypertRemoteService {
         startupTimeoutMs: resolved.startupTimeoutSeconds * 1_000,
         shutdownTimeoutMs: resolved.shutdownTimeoutSeconds * 1_000,
         environment: resolved.environment,
+        prepareRuntime: () => ensurePackagedRuntime(
+          resolved.runtimeArchive,
+          resolved.runtimeDirectory,
+        ),
         ...(credential === undefined ? {} : { credential }),
       }),
     })

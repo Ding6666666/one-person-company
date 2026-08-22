@@ -17,6 +17,7 @@ const SAFE_ENVIRONMENT_NAMES = [
 const COMPANY_ENVIRONMENT_NAMES = [
   'DSH_COMPANY_DATA_ROOT',
   'DSH_COMPANY_SESSION_ROOT',
+  'DSH_RUNTIME_MODE',
   'UV_PROJECT_ENVIRONMENT',
 ] as const
 
@@ -61,6 +62,7 @@ export interface CompanyHostLifecycleOptions {
   readonly fetch?: typeof fetch
   readonly reservePort?: () => Promise<number>
   readonly delay?: (milliseconds: number) => Promise<void>
+  readonly prepareRuntime?: () => Promise<void>
 }
 
 function delay(milliseconds: number): Promise<void> {
@@ -162,6 +164,7 @@ export class CompanyHostLifecycle {
     this.spawnFailed = false
     try {
       this.assignedPort = await this.allocatePort()
+      await this.options.prepareRuntime?.()
       const command = this.command()
       this.child = this.processSpawner(command[0]!, command.slice(1), {
         cwd: this.options.serviceDirectory,

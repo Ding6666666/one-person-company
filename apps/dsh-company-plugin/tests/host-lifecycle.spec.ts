@@ -79,6 +79,14 @@ describe('Company Host configuration', () => {
     expect(resolved.environment.UV_PROJECT_ENVIRONMENT).toBe(
       resolve(dataRoot, 'python-environment'),
     )
+    expect(resolved.environment.DSH_RUNTIME_MODE).toBe('node')
+    expect(resolved.runtimeArchive).toBe(
+      resolve(packageRoot, 'artifacts/dsh-python-node-runtime.tgz'),
+    )
+    expect(resolved.runtimeDirectory).toBe(resolve(
+      packageRoot,
+      'vendor/deepseek-harness/python/sdk-runtime/src/deepseek_harness_runtime/runtime/node',
+    ))
   })
 
   it('selects fixed child inputs without enumerating ambient credential names', () => {
@@ -135,6 +143,21 @@ describe('CompanyHostLifecycle', () => {
       '-m', 'uvicorn', 'dsh_company.asgi:app',
       '--host', '127.0.0.1', '--port', '43123',
     ])
+  })
+
+  it('prepares the packaged runtime before spawning Python', async () => {
+    const order: string[] = []
+    const host = createHost({
+      prepareRuntime: async () => { order.push('prepare') },
+      spawn: () => {
+        order.push('spawn')
+        return new FakeChild()
+      },
+    })
+
+    await host.start()
+
+    expect(order).toEqual(['prepare', 'spawn'])
   })
 
   it('passes an explicitly supplied credential only to the child environment', async () => {
