@@ -45,7 +45,9 @@ class _HarnessFactory(Protocol):
 
 def _prompt(submission: GatewaySubmission) -> str:
     criteria = "\n".join(f"- {criterion}" for criterion in submission.acceptance_criteria)
+    system_prompt = submission.employee.system_prompt.strip() or submission.employee.responsibility
     return (
+        f"System instructions:\n{system_prompt}\n\n"
         f"Employee responsibility:\n{submission.employee.responsibility}\n\n"
         f"Work objective:\n{submission.objective}\n\n"
         f"Acceptance criteria:\n{criteria}\n\n"

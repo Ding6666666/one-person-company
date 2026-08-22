@@ -124,6 +124,7 @@ class EmployeeRepository:
             role_template_key=revision.role_template_key,
             work_type=revision.work_type,
             avatar_key=revision.avatar_key,
+            system_prompt=revision.system_prompt,
             skill_refs_json=json.dumps(revision.skill_refs, ensure_ascii=False),
             tool_refs_json=json.dumps(revision.tool_refs, ensure_ascii=False),
             revision=revision_row,
@@ -195,6 +196,7 @@ class EmployeeRepository:
             role_template_key=revision.role_template_key,
             work_type=revision.work_type,
             avatar_key=revision.avatar_key,
+            system_prompt=revision.system_prompt,
             skill_refs_json=json.dumps(revision.skill_refs, ensure_ascii=False),
             tool_refs_json=json.dumps(revision.tool_refs, ensure_ascii=False),
             revision=revision_row,
@@ -254,6 +256,7 @@ class EmployeeRepository:
                 runtime_profile=revision_row.runtime_profile,
                 model=revision_row.model,
                 created_at=_from_sqlite_utc(revision_row.created_at),
+                system_prompt="" if profile_row is None else profile_row.system_prompt,
                 role_template_key=(
                     "custom" if profile_row is None else profile_row.role_template_key
                 ),

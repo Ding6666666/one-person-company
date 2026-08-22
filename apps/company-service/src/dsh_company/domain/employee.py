@@ -26,6 +26,7 @@ class EmployeeRevision:
     runtime_profile: str
     model: str
     created_at: datetime
+    system_prompt: str = ""
     role_template_key: str = "custom"
     work_type: str = "自定义工作"
     avatar_key: str = "custom"
@@ -77,6 +78,7 @@ class Employee:
         responsibility: str,
         runtime_profile: str,
         model: str,
+        system_prompt: str = "",
         role_template_key: str = "custom",
         work_type: str = "自定义工作",
         avatar_key: str = "custom",
@@ -96,6 +98,7 @@ class Employee:
             runtime_profile=runtime_profile,
             model=model,
             created_at=now,
+            system_prompt=system_prompt.strip(),
             role_template_key=role_template_key.strip(),
             work_type=work_type.strip(),
             avatar_key=avatar_key.strip(),

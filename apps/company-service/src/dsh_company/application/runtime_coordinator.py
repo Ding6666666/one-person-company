@@ -395,6 +395,7 @@ class RuntimeCoordinator:
                 employee_id=employee.employee.id,
                 employee_revision_id=employee.revision.id,
                 responsibility=employee.revision.responsibility,
+                system_prompt=employee.revision.system_prompt,
                 runtime_profile=employee.revision.runtime_profile,
                 model=employee.revision.model,
                 dsh_session_id=employee.binding.dsh_session_id,

@@ -58,6 +58,7 @@ const revisionSchema = z.object({
   employee_id: z.string(),
   revision_number: z.number(),
   responsibility: z.string(),
+  system_prompt: z.string(),
   runtime_profile: z.string(),
   model: z.string(),
   created_at: z.string(),

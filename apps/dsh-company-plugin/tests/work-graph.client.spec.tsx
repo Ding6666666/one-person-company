@@ -29,6 +29,7 @@ const employee = (index: number): Employee => ({
     employee_id: `emp-${index}`,
     revision_number: 1,
     responsibility: 'Collaborate',
+    system_prompt: 'Act as a professional collaborator.',
     runtime_profile: 'workspace_read',
     model: 'deepseek-chat',
     created_at: now,

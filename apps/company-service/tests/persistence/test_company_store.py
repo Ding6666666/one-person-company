@@ -117,6 +117,7 @@ def test_employee_revision_round_trip_preserves_binding(
             workspace_id=workspace.id,
             display_name="Editor",
             responsibility="Write",
+            system_prompt="# Role identity\nAct as a professional editor.",
             runtime_profile="workspace_read",
             model="deepseek-v4-flash",
             grants=(),
@@ -127,6 +128,7 @@ def test_employee_revision_round_trip_preserves_binding(
         ReviseEmployee(
             employee_id=created.employee.id,
             responsibility="Write and fact check",
+            system_prompt="# Role identity\nAct as a senior fact-checking editor.",
             runtime_profile="workspace_write",
             model="deepseek-v4-flash",
             grants=(),
@@ -134,10 +136,14 @@ def test_employee_revision_round_trip_preserves_binding(
     )
     with sqlite_uow as uow:
         reloaded = uow.employees.get(created.employee.id)
+        original = uow.employees.get_revision(created.employee.id, created.revision.id)
 
     assert reloaded == revised
     assert reloaded is not None
     assert reloaded.revision.revision_number == 2
+    assert reloaded.revision.system_prompt == "# Role identity\nAct as a senior fact-checking editor."
+    assert original is not None
+    assert original.revision.system_prompt == "# Role identity\nAct as a professional editor."
     assert reloaded.employee.current_revision_id == revised.revision.id
     assert reloaded.binding == created.binding
     assert all(

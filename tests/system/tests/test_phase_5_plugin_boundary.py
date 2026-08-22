@@ -309,7 +309,7 @@ def test_migration_history_has_the_real_phase_5_head() -> None:
     config = Config(str(ROOT / "apps/company-service/alembic.ini"))
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_current_head() == "0007_business_plugins"
+    assert script.get_current_head() == "0009_employee_system_prompt"
 
 
 def test_contract_snapshot_matches_its_recorded_api_revision() -> None:

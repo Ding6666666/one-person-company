@@ -13,6 +13,7 @@ class EmployeeRuntimeSnapshot:
     employee_id: EmployeeId
     employee_revision_id: EmployeeRevisionId
     responsibility: str
+    system_prompt: str
     runtime_profile: str
     model: str
     dsh_session_id: str

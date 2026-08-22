@@ -20,6 +20,7 @@ Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max
 Responsibility = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
 ]
+SystemPrompt = Annotated[str, StringConstraints(strip_whitespace=True, max_length=12000)]
 ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 ProfileKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 CapabilityRef = Annotated[
@@ -145,6 +146,7 @@ class EmployeeCreate(BaseModel):
     work_type: Name = "自定义工作"
     avatar_key: ProfileKey = "custom"
     responsibility: Responsibility
+    system_prompt: SystemPrompt = ""
     runtime_profile: Literal["workspace_read", "workspace_write", "network_denied"]
     model: ModelName
     grants: list[GrantCreate] = Field(default_factory=list)
@@ -157,6 +159,7 @@ class EmployeeRevise(BaseModel):
     work_type: Name | None = None
     avatar_key: ProfileKey | None = None
     responsibility: Responsibility
+    system_prompt: SystemPrompt | None = None
     runtime_profile: Literal["workspace_read", "workspace_write", "network_denied"]
     model: ModelName
     grants: list[GrantCreate] = Field(default_factory=list)
@@ -189,6 +192,7 @@ class EmployeeRevision(BaseModel):
     employee_id: str
     revision_number: int
     responsibility: str
+    system_prompt: str
     runtime_profile: str
     model: str
     created_at: datetime
@@ -236,6 +240,7 @@ class Employee(BaseModel):
                 employee_id=revision.employee_id,
                 revision_number=revision.revision_number,
                 responsibility=revision.responsibility,
+                system_prompt=revision.system_prompt,
                 runtime_profile=revision.runtime_profile,
                 model=revision.model,
                 created_at=revision.created_at,

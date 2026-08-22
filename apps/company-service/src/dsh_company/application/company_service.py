@@ -37,6 +37,7 @@ class CompanyService:
                 workspace_id=command.workspace_id,
                 display_name=command.display_name,
                 responsibility=command.responsibility,
+                system_prompt=command.system_prompt,
                 runtime_profile=command.runtime_profile,
                 model=command.model,
                 role_template_key=command.role_template_key,
@@ -66,6 +67,11 @@ class CompanyService:
                 runtime_profile=command.runtime_profile,
                 model=command.model,
                 created_at=datetime.now(UTC),
+                system_prompt=(
+                    current.revision.system_prompt
+                    if command.system_prompt is None
+                    else command.system_prompt.strip()
+                ),
                 role_template_key=command.role_template_key or current.revision.role_template_key,
                 work_type=command.work_type or current.revision.work_type,
                 avatar_key=command.avatar_key or current.revision.avatar_key,

@@ -28,6 +28,7 @@ def _employee_payload() -> dict[str, object]:
         "work_type": "产品管理",
         "avatar_key": "product-manager",
         "responsibility": "撰写内容",
+        "system_prompt": "# 角色定位\n你是一名专业编辑。",
         "runtime_profile": "workspace_read",
         "model": "deepseek-v4-flash",
         "skill_refs": [],
@@ -54,6 +55,7 @@ def test_create_workspace_and_employee_without_provider_credentials(
             "role_template_key": "product-manager",
             "work_type": "产品管理",
             "avatar_key": "product-manager",
+            "system_prompt": "# 角色定位\n你是一名专业编辑。",
             "skill_refs": [],
             "tool_refs": [],
         }
@@ -93,6 +95,7 @@ def test_list_get_and_revise_workspace_employee(client: TestClient) -> None:
         f"/employees/{employee['id']}/revisions",
         json={
             "responsibility": "撰写和事实核查",
+            "system_prompt": "# 角色定位\n你是一名资深事实核查编辑。",
             "runtime_profile": "workspace_write",
             "model": "deepseek-v4-flash",
             "grants": [],
@@ -107,6 +110,7 @@ def test_list_get_and_revise_workspace_employee(client: TestClient) -> None:
     assert fetched_employee.json() == employee
     assert revised.status_code == 200
     assert revised.json()["revision"]["revision_number"] == 2
+    assert revised.json()["revision"]["system_prompt"] == "# 角色定位\n你是一名资深事实核查编辑。"
     assert revised.json()["binding"] == employee["binding"]
 
 

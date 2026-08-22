@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -31,6 +31,7 @@ function employee(workspaceId: string, id: string, displayName: string): Schemas
       employee_id: id,
       revision_number: 1,
       responsibility: 'Write',
+      system_prompt: 'Act as a professional employee.',
       runtime_profile: 'workspace_read',
       model: 'deepseek-v4-flash',
       created_at: now,
@@ -137,6 +138,7 @@ class FakeCompanyRemote implements CompanyRemoteNamespace {
           employee_id: id,
           revision_number: 1,
           responsibility: body.responsibility,
+          system_prompt: body.system_prompt,
           runtime_profile: body.runtime_profile,
           model: body.model,
           created_at: now,
@@ -161,6 +163,23 @@ class FakeCompanyRemote implements CompanyRemoteNamespace {
     }
     throw new Error(`Unexpected fake request: ${input.method} ${input.path}`)
   }
+}
+
+async function openCustomProfile(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /自定义角色/u }))
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+}
+
+async function fillCustomProfile(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.type(screen.getByLabelText('工作类型'), '内容运营')
+  await user.type(screen.getByLabelText('昵称'), '编辑')
+  await user.type(screen.getByLabelText('职责'), '撰写内容')
+}
+
+async function reachEmployeeReview(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await user.click(screen.getByRole('button', { name: '下一步' }))
 }
 
 describe('Company core client', () => {
@@ -190,7 +209,7 @@ describe('Company core client', () => {
 
     const createA = controller.createEmployee({
       display_name: 'A', role_template_key: 'custom', work_type: '自定义工作', avatar_key: 'custom',
-      responsibility: 'Write', runtime_profile: 'workspace_read', model: 'deepseek-v4-flash', grants: [],
+      responsibility: 'Write', system_prompt: 'Act as a professional employee.', runtime_profile: 'workspace_read', model: 'deepseek-v4-flash', grants: [],
     })
     const selectB = controller.selectWorkspace('ws-b')
     remote.respond('GET', '/workspaces/ws-b/employees', [employee('ws-b', 'emp-b', 'B')])
@@ -227,18 +246,10 @@ describe('Company core client', () => {
     await user.click(screen.getByRole('button', { name: '确认创建' }))
     await user.click(await screen.findByRole('link', { name: '内容公司' }))
     await user.click(screen.getByRole('button', { name: '创建员工' }))
-
-    expect(screen.getByText('conversation.respond')).toBeVisible()
-    expect(screen.getByText('workspace.read')).toBeVisible()
-    expect(screen.getByText('session.history.read')).toBeVisible()
-    await user.type(screen.getByLabelText('员工名称'), '编辑')
-    await user.type(screen.getByLabelText('职责'), '撰写内容')
-    await user.selectOptions(screen.getByLabelText('运行配置'), 'workspace_write')
-    await user.clear(screen.getByLabelText('模型'))
-    await user.type(screen.getByLabelText('模型'), 'deepseek-chat')
-    await user.click(screen.getByRole('button', { name: '高级授权' }))
-    expect(screen.getByLabelText('授权动作')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: '保存员工' }))
+    await openCustomProfile(user)
+    await fillCustomProfile(user)
+    await reachEmployeeReview(user)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '创建员工' }))
 
     expect(await screen.findByRole('heading', { name: '编辑' })).toBeVisible()
     expect(remote.executionCalls).toEqual([])
@@ -247,10 +258,11 @@ describe('Company core client', () => {
       path: '/workspaces/ws-1/employees',
       body: {
         display_name: '编辑',
+        role_template_key: 'custom',
+        work_type: '内容运营',
         responsibility: '撰写内容',
         runtime_profile: 'workspace_write',
-        model: 'deepseek-chat',
-        grants: [],
+        model: 'deepseek-v4-flash',
       },
     })
   })
@@ -280,13 +292,14 @@ describe('Company core client', () => {
     await user.click(screen.getByRole('button', { name: '确认创建' }))
     await user.click(await screen.findByRole('link', { name: '内容公司' }))
     await user.click(screen.getByRole('button', { name: '创建员工' }))
-    await user.type(screen.getByLabelText('员工名称'), '编辑')
-    await user.type(screen.getByLabelText('职责'), '撰写内容')
+    await openCustomProfile(user)
+    await fillCustomProfile(user)
+    await reachEmployeeReview(user)
     remote.employeeCreateFailure = true
 
-    await user.click(screen.getByRole('button', { name: '保存员工' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '创建员工' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('employee_create_failed')
-    await user.click(screen.getByRole('button', { name: '保存员工' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '创建员工' }))
 
     expect(await screen.findByRole('heading', { name: '编辑' })).toBeVisible()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -304,12 +317,7 @@ describe('Company core client', () => {
     expect(remote.requests.filter(request => request.method === 'POST' && request.path === '/workspaces')).toEqual([])
   })
 
-  it.each([
-    ['员工名称', 121, '员工名称不能超过 120 个字符', false],
-    ['职责', 4001, '职责不能超过 4000 个字符', false],
-    ['模型', 201, '模型不能超过 200 个字符', false],
-    ['授权动作', 121, '授权动作不能超过 120 个字符', true],
-  ] as const)('validates the published %s length before sending', async (label, length, message, advanced) => {
+  it('validates the editable employee profile before advancing', async () => {
     const user = userEvent.setup()
     const remote = new FakeCompanyRemote()
     render(<CompanySurface remote={remote} />)
@@ -318,13 +326,13 @@ describe('Company core client', () => {
     await user.click(screen.getByRole('button', { name: '确认创建' }))
     await user.click(await screen.findByRole('link', { name: '内容公司' }))
     await user.click(screen.getByRole('button', { name: '创建员工' }))
-    fireEvent.change(screen.getByLabelText('员工名称'), { target: { value: '编辑' } })
+    await openCustomProfile(user)
+    fireEvent.change(screen.getByLabelText('工作类型'), { target: { value: '内容运营' } })
+    fireEvent.change(screen.getByLabelText('昵称'), { target: { value: 'x'.repeat(121) } })
     fireEvent.change(screen.getByLabelText('职责'), { target: { value: '撰写内容' } })
-    if (advanced) await user.click(screen.getByRole('button', { name: '高级授权' }))
-    fireEvent.change(screen.getByLabelText(label), { target: { value: 'x'.repeat(length) } })
-    await user.click(screen.getByRole('button', { name: '保存员工' }))
+    await user.click(screen.getByRole('button', { name: '下一步' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent(message)
+    expect(screen.getByRole('alert')).toHaveTextContent('请完整填写工作类型、昵称和职责。')
     expect(remote.requests.filter(request =>
       request.method === 'POST' && /\/employees$/u.test(request.path),
     )).toEqual([])
@@ -340,7 +348,7 @@ describe('Company core client', () => {
     expect(screen.getByRole('button', { name: '创建员工' })).toBeDisabled()
   })
 
-  it('validates an explicit grant locally before sending an employee request', async () => {
+  it('starts custom permissions from the executor actions', async () => {
     const user = userEvent.setup()
     const remote = new FakeCompanyRemote()
     render(<CompanySurface remote={remote} />)
@@ -350,26 +358,19 @@ describe('Company core client', () => {
     await user.click(screen.getByRole('button', { name: '确认创建' }))
     await user.click(await screen.findByRole('link', { name: '内容公司' }))
     await user.click(screen.getByRole('button', { name: '创建员工' }))
-    await user.type(screen.getByLabelText('员工名称'), '编辑')
-    await user.type(screen.getByLabelText('职责'), '撰写内容')
-    await user.click(screen.getByRole('button', { name: '高级授权' }))
-    await user.type(screen.getByLabelText('授权动作'), ' workspace.write ')
-    await user.clear(screen.getByLabelText('资源类型'))
-    await user.click(screen.getByRole('button', { name: '保存员工' }))
-
-    expect(screen.getByRole('alert')).toHaveTextContent('请输入资源类型')
-    expect(remote.requests.filter(request =>
-      request.method === 'POST' && /\/employees$/u.test(request.path),
-    )).toEqual([])
-
-    await user.type(screen.getByLabelText('资源类型'), ' workspace ')
-    await user.click(screen.getByRole('button', { name: '保存员工' }))
+    await openCustomProfile(user)
+    await fillCustomProfile(user)
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(screen.getByRole('button', { name: /自定义/u }))
+    expect(screen.getByLabelText(/修改工作区/u)).toBeChecked()
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '创建员工' }))
     expect(await screen.findByRole('heading', { name: '编辑' })).toBeVisible()
-    expect(remote.requests.at(-1)).toMatchObject({
-      body: {
-        grants: [{ action: 'workspace.write', resource_kind: 'workspace' }],
-      },
-    })
+    const request = remote.requests.at(-1)!
+    expect((request.body as Schemas['EmployeeCreate']).grants).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: 'workspace.write', resource_kind: 'workspace' }),
+    ]))
   })
 
   it('labels and validates dialogs, traps focus, closes on Escape, and restores trigger focus', async () => {

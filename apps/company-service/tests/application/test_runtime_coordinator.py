@@ -174,6 +174,7 @@ def _seed(
                 workspace_id=workspace.id,
                 display_name="Editor",
                 responsibility="Frozen responsibility",
+                system_prompt="Frozen system instructions",
                 runtime_profile="workspace_read",
                 model="deepseek-v4-flash",
             )
@@ -250,6 +251,7 @@ def test_coordinator_uses_revision_frozen_by_work_creation(
             employee_id=current.employee.id,
             revision_number=2,
             responsibility="Later responsibility",
+            system_prompt="Later system instructions",
             runtime_profile="network_denied",
             model="later-model",
             created_at=datetime.now(UTC),
@@ -269,6 +271,7 @@ def test_coordinator_uses_revision_frozen_by_work_creation(
     snapshot = gateway.submissions[0].employee
     assert snapshot.employee_revision_id == aggregate.nodes[0].employee_revision_id
     assert snapshot.responsibility == "Frozen responsibility"
+    assert snapshot.system_prompt == "Frozen system instructions"
     assert snapshot.runtime_profile == "workspace_read"
 
 

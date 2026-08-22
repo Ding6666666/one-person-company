@@ -108,23 +108,31 @@ class FakeHarnessFactory:
 
 
 def employee_snapshot(
-    *, session_id: str = "employee-emp-1", runtime_profile: str = "workspace_read"
+    *,
+    session_id: str = "employee-emp-1",
+    runtime_profile: str = "workspace_read",
+    system_prompt: str = "你是一名专业发布编辑。",
 ) -> EmployeeRuntimeSnapshot:
     return EmployeeRuntimeSnapshot(
         employee_id=EmployeeId("emp-1"),
         employee_revision_id=EmployeeRevisionId("rev-1"),
         responsibility="撰写清晰、准确的发布稿",
+        system_prompt=system_prompt,
         runtime_profile=runtime_profile,
         model="deepseek-chat",
         dsh_session_id=session_id,
     )
 
 
-def submission(*, runtime_profile: str = "workspace_read") -> GatewaySubmission:
+def submission(
+    *, runtime_profile: str = "workspace_read", system_prompt: str = "你是一名专业发布编辑。"
+) -> GatewaySubmission:
     return GatewaySubmission(
         attempt_id=AttemptId("attempt-1"),
         command_id="cmd-1",
-        employee=employee_snapshot(runtime_profile=runtime_profile),
+        employee=employee_snapshot(
+            runtime_profile=runtime_profile, system_prompt=system_prompt
+        ),
         objective="撰写发布稿",
         acceptance_criteria=("包含标题", "不超过 800 字"),
     )
@@ -175,6 +183,7 @@ def test_gateway_uses_deterministic_prompt_and_callback_sequence(tmp_path: Path)
 
     assert factory.last_harness is not None
     assert factory.last_harness.prompt == (
+        "System instructions:\n你是一名专业发布编辑。\n\n"
         "Employee responsibility:\n撰写清晰、准确的发布稿\n\n"
         "Work objective:\n撰写发布稿\n\n"
         "Acceptance criteria:\n- 包含标题\n- 不超过 800 字\n\n"
@@ -184,6 +193,19 @@ def test_gateway_uses_deterministic_prompt_and_callback_sequence(tmp_path: Path)
     assert [event.source_sequence for event in projected] == [1, 2]
     assert result.event_count == 2
     assert "must never escape" not in repr(result)
+
+
+def test_gateway_uses_responsibility_as_legacy_system_instruction(tmp_path: Path) -> None:
+    factory = FakeHarnessFactory()
+    gateway = make_gateway(factory, tmp_path)
+
+    gateway.submit(submission(system_prompt=""), on_event=lambda event: None)
+
+    assert factory.last_harness is not None
+    assert factory.last_harness.prompt.startswith(
+        "System instructions:\n撰写清晰、准确的发布稿\n\n"
+        "Employee responsibility:\n撰写清晰、准确的发布稿\n\n"
+    )
 
 
 def test_gateway_returns_typed_control_request_without_result_reference(

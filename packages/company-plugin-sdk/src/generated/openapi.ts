@@ -764,6 +764,11 @@ export interface components {
             runtime_profile: "workspace_read" | "workspace_write" | "network_denied";
             /** Skill Refs */
             skill_refs?: string[];
+            /**
+             * System Prompt
+             * @default
+             */
+            system_prompt: string;
             /** Tool Refs */
             tool_refs?: string[];
             /**
@@ -791,6 +796,8 @@ export interface components {
             runtime_profile: "workspace_read" | "workspace_write" | "network_denied";
             /** Skill Refs */
             skill_refs?: string[] | null;
+            /** System Prompt */
+            system_prompt?: string | null;
             /** Tool Refs */
             tool_refs?: string[] | null;
             /** Work Type */
@@ -821,6 +828,8 @@ export interface components {
             runtime_profile: string;
             /** Skill Refs */
             skill_refs: string[];
+            /** System Prompt */
+            system_prompt: string;
             /** Tool Refs */
             tool_refs: string[];
             /** Work Type */

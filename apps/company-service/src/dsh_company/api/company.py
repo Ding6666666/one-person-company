@@ -119,6 +119,7 @@ def create_employee(
                 workspace_id=WorkspaceId(workspace_id),
                 display_name=body.display_name,
                 responsibility=body.responsibility,
+                system_prompt=body.system_prompt,
                 runtime_profile=body.runtime_profile,
                 model=body.model,
                 grants=_grants(body.grants),
@@ -182,6 +183,7 @@ def revise_employee(
             ReviseEmployee(
                 employee_id=EmployeeId(employee_id),
                 responsibility=body.responsibility,
+                system_prompt=body.system_prompt,
                 runtime_profile=body.runtime_profile,
                 model=body.model,
                 grants=_grants(body.grants),

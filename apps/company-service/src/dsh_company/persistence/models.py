@@ -71,6 +71,7 @@ class EmployeeRevisionProfileRow(Base):
     role_template_key: Mapped[str] = mapped_column(String, nullable=False)
     work_type: Mapped[str] = mapped_column(String, nullable=False)
     avatar_key: Mapped[str] = mapped_column(String, nullable=False)
+    system_prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
     skill_refs_json: Mapped[str] = mapped_column(Text, nullable=False)
     tool_refs_json: Mapped[str] = mapped_column(Text, nullable=False)
     revision: Mapped[EmployeeRevisionRow] = relationship(back_populates="profile")

@@ -28,7 +28,7 @@ const employee: Schemas['Employee'] = {
   current_revision_id: 'rev-1',
   created_at: now,
   revision: {
-    id: 'rev-1', employee_id: 'emp-1', revision_number: 1, responsibility: '撰写内容',
+    id: 'rev-1', employee_id: 'emp-1', revision_number: 1, responsibility: '撰写内容', system_prompt: '你是一名专业编辑。',
     runtime_profile: 'workspace_read', model: 'deepseek-chat', created_at: now,
     role_template_key: 'custom', work_type: '自定义工作', avatar_key: 'custom', skill_refs: [], tool_refs: [],
   },
