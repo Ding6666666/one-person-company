@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -8,6 +10,7 @@ import { CompanyHostLifecycle } from './lifecycle.js'
 import { CompanyPluginService } from './plugin.js'
 
 const CREDENTIAL_REF = credentialRef('DEEPSEEK_API_KEY')
+const PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -23,11 +26,12 @@ export class CompanyHostService extends TypertRemoteService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'company')
-    const resolved = resolveHostConfig(config)
+    const resolved = resolveHostConfig(config, PACKAGE_ROOT)
     this.product = new CompanyPluginService({
       resolveCredential: async () => (await ctx.credentials.resolve(CREDENTIAL_REF))?.value,
       createLifecycle: credential => new CompanyHostLifecycle({
-        pythonPath: resolved.pythonPath,
+        executable: resolved.executable,
+        executableArguments: resolved.executableArguments,
         serviceDirectory: resolved.serviceDirectory,
         startupTimeoutMs: resolved.startupTimeoutSeconds * 1_000,
         shutdownTimeoutMs: resolved.shutdownTimeoutSeconds * 1_000,

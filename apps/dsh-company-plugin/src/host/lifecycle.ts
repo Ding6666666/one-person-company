@@ -17,6 +17,7 @@ const SAFE_ENVIRONMENT_NAMES = [
 const COMPANY_ENVIRONMENT_NAMES = [
   'DSH_COMPANY_DATA_ROOT',
   'DSH_COMPANY_SESSION_ROOT',
+  'UV_PROJECT_ENVIRONMENT',
 ] as const
 
 export type HostStatus = 'stopped' | 'starting' | 'online' | 'stopping' | 'stop_failed'
@@ -48,7 +49,8 @@ export interface HostEndpoints {
 }
 
 export interface CompanyHostLifecycleOptions {
-  readonly pythonPath: string
+  readonly executable: string
+  readonly executableArguments: readonly string[]
   readonly serviceDirectory: string
   readonly startupTimeoutMs?: number
   readonly pollIntervalMs?: number
@@ -142,7 +144,8 @@ export class CompanyHostLifecycle {
   command(): readonly string[] {
     if (this.assignedPort === undefined) throw new Error('Company Host port is not assigned.')
     return [
-      this.options.pythonPath,
+      this.options.executable,
+      ...this.options.executableArguments,
       '-m',
       'uvicorn',
       'dsh_company.asgi:app',

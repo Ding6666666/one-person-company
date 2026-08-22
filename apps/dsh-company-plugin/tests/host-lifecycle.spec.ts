@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { createServer } from 'node:net'
+import { resolve } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -33,7 +34,8 @@ afterEach(async () => {
 
 function createHost(overrides: Partial<ConstructorParameters<typeof CompanyHostLifecycle>[0]> = {}) {
   const host = new CompanyHostLifecycle({
-    pythonPath: 'python.exe',
+    executable: 'python.exe',
+    executableArguments: [],
     serviceDirectory: 'C:/company-service',
     startupTimeoutMs: 25,
     pollIntervalMs: 1,
@@ -56,10 +58,27 @@ describe('Company Host configuration', () => {
       pythonPath: 'python.exe',
       serviceDirectory: 'C:/company-service',
       dataRoot,
-    })
+    }, 'C:/installed-company-plugin')
 
+    expect(resolved.executable).toBe('python.exe')
+    expect(resolved.executableArguments).toEqual([])
     expect(resolved.environment.DSH_COMPANY_DATA_ROOT).toBe(dataRoot)
     expect(resolved.environment).not.toHaveProperty('DEEPSEEK_API_KEY')
+  })
+
+  it('defaults to the packaged uv project and a data-root environment', () => {
+    const packageRoot = resolve('C:/profile/node_modules/@dsh/company-plugin')
+    const dataRoot = resolve('C:/profile/dsh-company')
+    const resolved = resolveHostConfig({ dataRoot }, packageRoot)
+
+    expect(resolved.executable).toBe('uv')
+    expect(resolved.executableArguments).toEqual([
+      'run', '--frozen', '--no-dev', '--project', packageRoot, 'python',
+    ])
+    expect(resolved.serviceDirectory).toBe(resolve(packageRoot, 'apps/company-service'))
+    expect(resolved.environment.UV_PROJECT_ENVIRONMENT).toBe(
+      resolve(dataRoot, 'python-environment'),
+    )
   })
 
   it('selects fixed child inputs without enumerating ambient credential names', () => {
@@ -98,6 +117,24 @@ describe('CompanyHostLifecycle', () => {
       env: expect.not.objectContaining({ ACCESS_TOKEN: 'not-forwarded' }),
     }))
     expect(host.status).toBe('online')
+  })
+
+  it('prefixes the uvicorn command for the packaged uv project', async () => {
+    const packageRoot = resolve('C:/profile/node_modules/@dsh/company-plugin')
+    const host = createHost({
+      executable: 'uv',
+      executableArguments: [
+        'run', '--frozen', '--no-dev', '--project', packageRoot, 'python',
+      ],
+    })
+
+    await host.start()
+
+    expect(host.command()).toEqual([
+      'uv', 'run', '--frozen', '--no-dev', '--project', packageRoot, 'python',
+      '-m', 'uvicorn', 'dsh_company.asgi:app',
+      '--host', '127.0.0.1', '--port', '43123',
+    ])
   })
 
   it('passes an explicitly supplied credential only to the child environment', async () => {
