@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 
 from fastapi import APIRouter
 
+from dsh_company.api.capability_sources import router as capability_sources_router
 from dsh_company.api.company import router as company_router
 from dsh_company.api.governance import router as governance_router
 from dsh_company.api.plugins import router as plugins_router
@@ -13,6 +14,7 @@ from dsh_company.application.ports import WorkCoordinator, WorkUnitOfWork
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
 from dsh_company.application.runtime_governance import RuntimeGovernanceHandler
 from dsh_company.business_plugins.registry import BusinessPluginRegistry
+from dsh_company.capability_sources.registry import CapabilitySourceRegistry
 from dsh_company.domain.ids import (
     ArtifactReferenceId,
     AttemptId,
@@ -99,6 +101,7 @@ class _TerminalObserverProxy:
 def _company_router() -> APIRouter:
     router = APIRouter()
     router.include_router(company_router)
+    router.include_router(capability_sources_router)
     router.include_router(work_router)
     router.include_router(governance_router)
     router.include_router(plugins_router)
@@ -117,6 +120,7 @@ class ComponentAssembly:
     router: APIRouter = field(default_factory=_company_router)
     startup: Callable[[], None] = _noop
     dispose: Callable[[], None] = _noop
+    capability_sources: CapabilitySourceRegistry = field(default_factory=CapabilitySourceRegistry)
 
 
 def create_production_assembly(settings: Settings) -> ComponentAssembly:

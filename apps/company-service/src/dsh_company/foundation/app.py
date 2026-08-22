@@ -15,6 +15,11 @@ class HealthResponse(BaseModel):
     service: Literal["dsh-company"]
 
 
+class RuntimeOptions(BaseModel):
+    provider: str
+    default_model: str
+
+
 def create_app(
     settings: Settings | None = None,
     assembly: ComponentAssembly | None = None,
@@ -43,6 +48,13 @@ def create_app(
     @app.get("/health", tags=["foundation"], response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse(status="ok", service="dsh-company")
+
+    @app.get("/runtime-options", tags=["foundation"], response_model=RuntimeOptions)
+    def runtime_options() -> RuntimeOptions:
+        return RuntimeOptions(
+            provider=resolved_settings.dsh_provider,
+            default_model=resolved_settings.dsh_model,
+        )
 
     app.include_router(app.state.assembly.router, tags=["company"])
 
