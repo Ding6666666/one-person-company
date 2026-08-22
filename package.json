@@ -1,17 +1,83 @@
 {
-  "name": "dsh-company-workspace",
+  "name": "@dsh/company-plugin",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "type": "module",
+  "description": "A durable one-person company plugin for DeepSeek Harness",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Ding6666666/one-person-company#readme",
+  "bugs": {
+    "url": "https://github.com/Ding6666666/one-person-company/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ding6666666/one-person-company.git"
+  },
+  "main": "./apps/dsh-company-plugin/dist/index.mjs",
+  "types": "./apps/dsh-company-plugin/lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./apps/dsh-company-plugin/lib/types/index.d.ts",
+      "default": "./apps/dsh-company-plugin/dist/index.mjs"
+    },
+    "./client": {
+      "types": "./apps/dsh-company-plugin/lib/types/client/index.d.ts",
+      "default": "./apps/dsh-company-plugin/dist/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
   "packageManager": "pnpm@11.7.0",
   "engines": { "node": ">=22.19.0", "pnpm": ">=11.0.0" },
   "scripts": {
-    "build": "pnpm --filter @dsh/company-plugin build && pnpm --filter @dsh/company-plugin-sdk build",
-    "typecheck": "pnpm --filter @dsh/company-plugin typecheck && pnpm --filter @dsh/company-plugin-sdk typecheck",
-    "test": "pnpm --filter @dsh/company-plugin test && pnpm --filter @dsh/company-plugin-sdk test",
-    "check": "pnpm run contracts:test && pnpm --filter @dsh/company-plugin check && pnpm --filter @dsh/company-plugin-sdk check",
+    "build": "pnpm --filter @dsh/company-plugin-build build && pnpm --filter @dsh/company-plugin-sdk build",
+    "typecheck": "pnpm --filter @dsh/company-plugin-build typecheck && pnpm --filter @dsh/company-plugin-sdk typecheck",
+    "test": "pnpm --filter @dsh/company-plugin-build test && pnpm --filter @dsh/company-plugin-sdk test",
+    "check": "pnpm run contracts:test && pnpm --filter @dsh/company-plugin-build check && pnpm --filter @dsh/company-plugin-sdk check",
     "contracts:test": "node --test packages/contracts/tests/contract-tools.test.mjs",
     "contracts:capture": "node packages/contracts/scripts/capture-company-service-openapi.mjs --output packages/contracts/openapi/openapi.json --revision-output packages/contracts/openapi/source-revision.json",
     "contracts:generate": "node packages/contracts/scripts/generate-types.mjs --input packages/contracts/openapi/openapi.json --output apps/dsh-company-plugin/src/contracts/generated/openapi.ts && node packages/contracts/scripts/generate-types.mjs --input packages/contracts/openapi/openapi.json --output packages/company-plugin-sdk/src/generated/openapi.ts"
   },
-  "devDependencies": { "openapi-typescript": "7.13.0" }
+  "dependencies": {
+    "react": "18.2.0",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-api-remotes": "*",
+    "@deepseek-ai/dsh-client-locale": "*",
+    "@deepseek-ai/dsh-client-runtime": "*",
+    "@deepseek-ai/dsh-client-ui-layout": "*",
+    "@deepseek-ai/dsh-client-ui-slots": "*",
+    "@deepseek-ai/dsh-client-ui-sidebar": "*",
+    "@deepseek-ai/dsh-credentials": "*",
+    "@deepseek-ai/dsh-typert-protocol": "*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "link:./vendor/deepseek-harness/packages/api/remotes",
+    "@deepseek-ai/dsh-client-locale": "link:./vendor/deepseek-harness/packages/client/locale",
+    "@deepseek-ai/dsh-client-runtime": "link:./vendor/deepseek-harness/packages/client/runtime",
+    "@deepseek-ai/dsh-client-ui-layout": "link:./vendor/deepseek-harness/packages/client/ui-layout",
+    "@deepseek-ai/dsh-client-ui-slots": "link:./vendor/deepseek-harness/packages/client/ui-slots",
+    "@deepseek-ai/dsh-client-ui-sidebar": "link:./vendor/deepseek-harness/packages/client/ui-sidebar",
+    "@deepseek-ai/dsh-credentials": "link:./vendor/deepseek-harness/packages/credentials/credentials",
+    "@deepseek-ai/dsh-typert-protocol": "link:./vendor/deepseek-harness/packages/typert/protocol",
+    "openapi-typescript": "7.13.0"
+  }
 }

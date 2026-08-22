@@ -7,7 +7,41 @@ settings:
 importers:
 
   .:
+    dependencies:
+      react:
+        specifier: 18.2.0
+        version: 18.2.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.1
+        version: 4.0.1
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: link:./vendor/deepseek-harness/packages/api/remotes
+        version: link:vendor/deepseek-harness/packages/api/remotes
+      '@deepseek-ai/dsh-client-locale':
+        specifier: link:./vendor/deepseek-harness/packages/client/locale
+        version: link:vendor/deepseek-harness/packages/client/locale
+      '@deepseek-ai/dsh-client-runtime':
+        specifier: link:./vendor/deepseek-harness/packages/client/runtime
+        version: link:vendor/deepseek-harness/packages/client/runtime
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: link:./vendor/deepseek-harness/packages/client/ui-layout
+        version: link:vendor/deepseek-harness/packages/client/ui-layout
+      '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: link:./vendor/deepseek-harness/packages/client/ui-sidebar
+        version: link:vendor/deepseek-harness/packages/client/ui-sidebar
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: link:./vendor/deepseek-harness/packages/client/ui-slots
+        version: link:vendor/deepseek-harness/packages/client/ui-slots
+      '@deepseek-ai/dsh-credentials':
+        specifier: link:./vendor/deepseek-harness/packages/credentials/credentials
+        version: link:vendor/deepseek-harness/packages/credentials/credentials
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: link:./vendor/deepseek-harness/packages/typert/protocol
+        version: link:vendor/deepseek-harness/packages/typert/protocol
       openapi-typescript:
         specifier: 7.13.0
         version: 7.13.0(typescript@5.9.3)

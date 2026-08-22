@@ -32,9 +32,21 @@ def test_node_workspace_contains_only_company_products() -> None:
         "- apps/dsh-company-plugin",
         "- packages/company-plugin-sdk",
     ]
-    assert plugin_package["name"] == "@dsh/company-plugin"
+    assert plugin_package["name"] == "@dsh/company-plugin-build"
     assert sdk_package["name"] == "@dsh/company-plugin-sdk"
     assert sdk_package.get("dependencies", {}) == {}
+
+
+def test_repository_root_is_the_public_dsh_bundle() -> None:
+    manifest = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+
+    assert manifest["name"] == "@dsh/company-plugin"
+    assert manifest["private"] is False
+    assert manifest["license"] == "Apache-2.0"
+    assert manifest["repository"]["url"] == (
+        "git+https://github.com/Ding6666666/one-person-company.git"
+    )
+    assert manifest["dsh"]["bundle"]["patch"] == "./cordis.patch.yml"
 
 
 def test_dsh_submodule_uses_the_pinned_vendor_location() -> None:
