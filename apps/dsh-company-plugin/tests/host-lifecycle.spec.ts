@@ -53,7 +53,7 @@ function createHost(overrides: Partial<ConstructorParameters<typeof CompanyHostL
 
 describe('Company Host configuration', () => {
   it('uses the company data root and no inherited credential values', () => {
-    const dataRoot = 'C:\\profile\\dsh-company'
+    const dataRoot = resolve('profile', 'dsh-company')
     const resolved = resolveHostConfig({
       pythonPath: 'python.exe',
       serviceDirectory: 'C:/company-service',
