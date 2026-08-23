@@ -7,7 +7,9 @@ type MaterializePath<Path extends string> =
     ? `${Prefix}${string}${MaterializePath<Suffix>}`
     : Path
 
-export type CompanyRequestPath = MaterializePath<OpenApiPath>
+export type CompanyRequestPath =
+  | MaterializePath<OpenApiPath>
+  | `/workspaces/${string}/messages?work_id=${string}`
 
 export interface RemoteResult<T> {
   readonly status: number

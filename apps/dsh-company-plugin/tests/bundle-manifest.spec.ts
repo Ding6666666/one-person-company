@@ -12,6 +12,7 @@ describe('DSH Company plugin bundle', () => {
     expect(root.exports['.'].default).toBe('./apps/dsh-company-plugin/dist/index.mjs')
     expect(root.exports['./client'].default).toBe('./apps/dsh-company-plugin/dist/client.js')
     expect(root.dsh.bundle.patch).toBe('./cordis.patch.yml')
+    expect(root.dsh.client.inject).toContain('@deepseek-ai/dsh-client-connection')
     expect(patch).toContain(`name: '${root.name}'`)
   })
 
@@ -30,5 +31,7 @@ describe('DSH Company plugin bundle', () => {
 
     expect(bundle).toContain('window.__ModuleLoader__.load')
     expect(bundle).toContain(`id: "${root.name}"`)
+    expect(bundle).toContain('data:image/png;base64,')
+    expect(bundle).not.toContain('../assets/employee-avatars')
   })
 })

@@ -141,7 +141,9 @@ def test_employee_revision_round_trip_preserves_binding(
     assert reloaded == revised
     assert reloaded is not None
     assert reloaded.revision.revision_number == 2
-    assert reloaded.revision.system_prompt == "# Role identity\nAct as a senior fact-checking editor."
+    assert reloaded.revision.system_prompt == (
+        "# Role identity\nAct as a senior fact-checking editor."
+    )
     assert original is not None
     assert original.revision.system_prompt == "# Role identity\nAct as a professional editor."
     assert reloaded.employee.current_revision_id == revised.revision.id

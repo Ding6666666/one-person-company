@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { CompanyPluginClient, CompanyPluginError } from '../src/index.js'
+import type { components } from '../src/generated/openapi.js'
 
 describe('CompanyPluginClient', () => {
+  it('publishes the generated company chat collection', () => {
+    const collection: components['schemas']['ChatMessageCollection'] = { messages: [] }
+
+    expect(collection.messages).toEqual([])
+  })
   it('calls only the public business plugin and template endpoints', async () => {
     const request = vi.fn(async (input: { method: string, path: string, body?: unknown }) => ({
       status: input.method === 'POST' ? 201 : 200,

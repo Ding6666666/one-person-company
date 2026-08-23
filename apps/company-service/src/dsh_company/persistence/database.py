@@ -4,6 +4,7 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.pool import ConnectionPoolEntry
 
+from . import chat_models as _chat_models  # noqa: F401
 from . import work_models as _work_models  # noqa: F401
 from .models import Base
 

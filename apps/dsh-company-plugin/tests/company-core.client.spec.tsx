@@ -83,6 +83,7 @@ class FakeCompanyRemote implements CompanyRemoteNamespace {
   listFailure = false
   workspaceCreateFailure = false
   employeeCreateFailure = false
+  legacyEmployeeResponse = false
 
   async connection(): Promise<RemoteResult<{ readonly status: 'online' }>> {
     return { status: 200, body: { status: 'online' } }
@@ -159,6 +160,11 @@ class FakeCompanyRemote implements CompanyRemoteNamespace {
         grants: [],
       }
       this.employees.get(workspaceId)?.push(employee)
+      if (this.legacyEmployeeResponse) {
+        const response = structuredClone(employee) as unknown as { revision: Record<string, unknown> }
+        delete response.revision.system_prompt
+        return { status: 201, body: response }
+      }
       return { status: 201, body: employee }
     }
     throw new Error(`Unexpected fake request: ${input.method} ${input.path}`)
@@ -172,7 +178,7 @@ async function openCustomProfile(user: ReturnType<typeof userEvent.setup>): Prom
 
 async function fillCustomProfile(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.type(screen.getByLabelText('工作类型'), '内容运营')
-  await user.type(screen.getByLabelText('昵称'), '编辑')
+  await user.type(screen.getByLabelText('昵称（选填）'), '编辑')
   await user.type(screen.getByLabelText('职责'), '撰写内容')
 }
 
@@ -183,6 +189,47 @@ async function reachEmployeeReview(user: ReturnType<typeof userEvent.setup>): Pr
 }
 
 describe('Company core client', () => {
+  it('normalizes employee revision fields omitted by observed local service versions', async () => {
+    const complete = employee('ws-1', 'emp-1', '产品经理')
+    const withoutPrompt = structuredClone(complete) as unknown as { revision: Record<string, unknown> }
+    delete withoutPrompt.revision.system_prompt
+    const legacy = structuredClone(withoutPrompt)
+    delete legacy.revision.role_template_key
+    delete legacy.revision.work_type
+    delete legacy.revision.avatar_key
+    delete legacy.revision.skill_refs
+    delete legacy.revision.tool_refs
+    const responses = [withoutPrompt, legacy]
+    const api = new ProductApi({
+      request: async () => ({ status: 201, body: responses.shift() }),
+    })
+    const input: Schemas['EmployeeCreate'] = {
+      display_name: '产品经理', role_template_key: 'product-manager', work_type: '产品管理', avatar_key: 'product-manager',
+      responsibility: '规划产品', system_prompt: '专业完成产品工作。', runtime_profile: 'workspace_write', model: 'deepseek-v4-flash',
+    }
+
+    await expect(api.createEmployee('ws-1', input)).resolves.toMatchObject({
+      revision: { system_prompt: '' },
+    })
+    await expect(api.createEmployee('ws-1', input)).resolves.toMatchObject({
+      revision: {
+        system_prompt: '', role_template_key: 'custom', work_type: '自定义工作', avatar_key: 'custom',
+        skill_refs: [], tool_refs: [],
+      },
+    })
+  })
+
+  it('still rejects an employee response missing a core binding', async () => {
+    const invalid = structuredClone(employee('ws-1', 'emp-1', '产品经理')) as unknown as Record<string, unknown>
+    delete invalid.binding
+    const api = new ProductApi({ request: async () => ({ status: 201, body: invalid }) })
+
+    await expect(api.createEmployee('ws-1', {
+      display_name: '产品经理', role_template_key: 'product-manager', work_type: '产品管理', avatar_key: 'product-manager',
+      responsibility: '规划产品', system_prompt: '专业完成产品工作。', runtime_profile: 'workspace_write', model: 'deepseek-v4-flash',
+    })).rejects.toMatchObject({ code: 'invalid_company_response' })
+  })
+
   it('keeps the latest workspace employees when an earlier selection resolves last', async () => {
     const remote = new DeferredCompanyRemote()
     const controller = new CompanyController(new ProductApi(remote))
@@ -267,6 +314,42 @@ describe('Company core client', () => {
     })
   })
 
+  it('provides an explicit close control on the employee creation dialog', async () => {
+    const user = userEvent.setup()
+    const remote = new FakeCompanyRemote()
+    remote.workspaces.push({ id: 'ws-1', name: '内容公司', created_at: now })
+    remote.employees.set('ws-1', [])
+    render(<CompanySurface remote={remote} />)
+
+    await user.click(await screen.findByRole('link', { name: '内容公司' }))
+    await user.click(screen.getByRole('button', { name: '创建员工' }))
+    const dialog = screen.getByRole('dialog', { name: '创建员工' })
+    await user.click(within(dialog).getByRole('button', { name: '关闭创建员工' }))
+
+    expect(screen.queryByRole('dialog', { name: '创建员工' })).not.toBeInTheDocument()
+  })
+
+  it('closes the dialog and renders the employee after an observed legacy success response', async () => {
+    const user = userEvent.setup()
+    const remote = new FakeCompanyRemote()
+    remote.legacyEmployeeResponse = true
+    remote.workspaces.push({ id: 'ws-1', name: '内容公司', created_at: now })
+    remote.employees.set('ws-1', [])
+    render(<CompanySurface remote={remote} />)
+
+    await user.click(await screen.findByRole('link', { name: '内容公司' }))
+    await user.click(screen.getByRole('button', { name: '创建员工' }))
+    await openCustomProfile(user)
+    await user.type(screen.getByLabelText('工作类型'), '内容运营')
+    await user.type(screen.getByLabelText('职责'), '撰写内容')
+    await reachEmployeeReview(user)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '创建员工' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '创建员工' })).not.toBeInTheDocument())
+    expect(await screen.findByRole('heading', { name: '内容运营' })).toBeVisible()
+    expect(screen.queryByText('invalid_company_response')).not.toBeInTheDocument()
+  })
+
   it('clears the workspace mutation error phase after a successful retry', async () => {
     const user = userEvent.setup()
     const remote = new FakeCompanyRemote()
@@ -299,6 +382,7 @@ describe('Company core client', () => {
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '创建员工' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('employee_create_failed')
+    expect(screen.getByRole('dialog', { name: '创建员工' })).toBeVisible()
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '创建员工' }))
 
     expect(await screen.findByRole('heading', { name: '编辑' })).toBeVisible()
@@ -328,11 +412,11 @@ describe('Company core client', () => {
     await user.click(screen.getByRole('button', { name: '创建员工' }))
     await openCustomProfile(user)
     fireEvent.change(screen.getByLabelText('工作类型'), { target: { value: '内容运营' } })
-    fireEvent.change(screen.getByLabelText('昵称'), { target: { value: 'x'.repeat(121) } })
+    fireEvent.change(screen.getByLabelText('昵称（选填）'), { target: { value: 'x'.repeat(121) } })
     fireEvent.change(screen.getByLabelText('职责'), { target: { value: '撰写内容' } })
     await user.click(screen.getByRole('button', { name: '下一步' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('请完整填写工作类型、昵称和职责。')
+    expect(screen.getByRole('alert')).toHaveTextContent('请完整填写工作类型和职责。')
     expect(remote.requests.filter(request =>
       request.method === 'POST' && /\/employees$/u.test(request.path),
     )).toEqual([])
@@ -387,6 +471,8 @@ describe('Company core client', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('请输入名称')
 
     submit.focus()
+    await user.tab()
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveFocus()
     await user.tab()
     expect(name).toHaveFocus()
     await user.keyboard('{Escape}')

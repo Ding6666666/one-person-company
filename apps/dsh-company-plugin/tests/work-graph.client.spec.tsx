@@ -53,6 +53,31 @@ const employee = (index: number): Employee => ({
 afterEach(cleanup)
 
 describe('multi-employee work graph experience', () => {
+  it('explains all four strategies with selectable cards and expanded details', async () => {
+    const user = userEvent.setup()
+    render(<StrategyComposer employees={[employee(1), employee(2), employee(3)]} pending={false} onCancel={() => undefined} onStart={async () => undefined} t={translate('zh')} />)
+
+    const direct = screen.getByRole('button', { name: /Direct.*单人执行/u })
+    expect(direct).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Star.*中心协作/u })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Graph.*流程编排/u })).toBeVisible()
+    const battle = screen.getByRole('button', { name: /Battle.*方案竞选/u })
+    expect(battle).toBeVisible()
+    expect(screen.getByText('一名员工独立负责，从目标执行到最终交付保持单一责任人。')).toBeVisible()
+    expect(screen.getByText('边界清晰、无需多人协作的单项任务')).toBeVisible()
+    expect(screen.queryByLabelText('策略')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('负责员工')).toBeVisible()
+
+    await user.click(battle)
+
+    expect(battle).toHaveAttribute('aria-pressed', 'true')
+    expect(direct).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('多名员工独立提出方案，再由另一名员工比较并汇总。')).toBeVisible()
+    expect(screen.getByText('需要多个独立观点或候选方案的决策任务')).toBeVisible()
+    expect(screen.getByRole('group', { name: /参与员工/u })).toBeVisible()
+    expect(screen.queryByLabelText('负责员工')).not.toBeInTheDocument()
+  })
+
   it('enforces every generated strategy bound and graph invariant locally', () => {
     const activeIds = new Set(['emp-1', 'emp-2', 'emp-3', 'emp-4'])
     const base: StrategyDraft = {
@@ -107,7 +132,7 @@ describe('multi-employee work graph experience', () => {
     const user = userEvent.setup()
     render(<StrategyComposer employees={employees} pending={false} onCancel={() => undefined} onStart={onStart} t={t} />)
 
-    await user.selectOptions(screen.getByLabelText('Strategy'), 'battle')
+    await user.click(screen.getByRole('button', { name: /Battle.*Proposal battle/u }))
     await user.type(screen.getByLabelText('Work objective'), 'Propose a launch campaign')
     await user.type(screen.getByLabelText('Acceptance criteria'), 'Cites evidence')
     await user.click(screen.getByRole('button', { name: 'Start work' }))
@@ -172,7 +197,7 @@ describe('multi-employee work graph experience', () => {
 
     await user.click(await screen.findByRole('link', { name: 'Work' }))
     await user.click(await screen.findByRole('button', { name: 'Create work' }))
-    await user.selectOptions(screen.getByLabelText('Strategy'), 'battle')
+    await user.click(screen.getByRole('button', { name: /Battle.*Proposal battle/u }))
     await user.type(screen.getByLabelText('Work objective'), 'Compare launch proposals')
     await user.type(screen.getByLabelText('Acceptance criteria'), 'Synthesize evidence')
     for (const name of ['Employee 1', 'Employee 2', 'Employee 3']) {

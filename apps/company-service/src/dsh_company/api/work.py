@@ -3,6 +3,7 @@ from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Request, status
 
+from dsh_company.application.chat_service import ChatService
 from dsh_company.application.ports import DuplicateCommand, WorkAggregate
 from dsh_company.application.work_commands import CreateDirectWork
 from dsh_company.application.work_service import WorkCancellationNotSupported, WorkService
@@ -69,8 +70,17 @@ def create_work(
     service: WorkServiceDependency,
 ) -> WorkProjection:
     if isinstance(body, DirectWorkCreate):
-        return _create_legacy_direct(workspace_id, body, service)
+        projection = _create_legacy_direct(workspace_id, body, service)
+        ChatService(
+            request.app.state.assembly.uow_factory(),
+            request.app.state.assembly.chat_dispatch_queue,
+        ).ensure_work_card(WorkId(projection.id))
+        return projection
     aggregate, _created = _create_strategy_work(request, WorkspaceId(workspace_id), body)
+    ChatService(
+        request.app.state.assembly.uow_factory(),
+        request.app.state.assembly.chat_dispatch_queue,
+    ).ensure_work_card(aggregate.work.id)
     # Starting the persisted current graph is idempotent.  A repeated command is
     # also the public, explicit retry signal for a retryable blocked attempt.
     request.app.state.assembly.orchestration_engine.start(aggregate.graph.id)

@@ -66,12 +66,23 @@ Templates select their default avatar automatically. The custom role starts with
 A template is an editable starting point, not a locked persona. It pre-fills:
 
 - Work type
-- Suggested nickname
 - Responsibility
+- System Prompt
 - Permission level
 - Recommended model
 
-Nickname and responsibility inputs include pale, role-specific examples. The user may change every pre-filled value. The custom role contains no fixed content and instead shows clear examples for work type, nickname, and responsibility.
+Nickname and responsibility inputs include pale, role-specific examples. Nickname is never pre-filled and is cleared whenever the user selects a role card, including when switching between templates. The user may change every pre-filled value. The custom role contains no fixed work type or responsibility and instead shows clear examples for work type, nickname, and responsibility.
+
+### Responsibility and System Prompt
+
+Responsibility and System Prompt are separate employee revision fields.
+
+- **Responsibility** is a concise, user-facing description of the employee's ownership and expected outcomes. It appears in profile and review surfaces.
+- **System Prompt** is the agent-facing execution contract. It is generated from the selected role template, hidden under an expandable Advanced settings section, and remains fully editable before creation.
+
+Every product and technology template provides a professional System Prompt with the same operating structure: role identity, core objectives, working boundaries, standard workflow, output requirements, collaboration and escalation, and capability-use rules. The role-specific workflow and deliverables differ by profession. The custom role receives a neutral structured skeleton rather than a product or engineering persona.
+
+The persisted System Prompt is a snapshot. Later template edits do not silently change existing employees. Runtime permissions, Skills, Tools, model, objective, and acceptance criteria remain dynamic execution context and are not copied into the template text as stale capability lists. At dispatch time the gateway places System Prompt, responsibility, work objective, and acceptance criteria in distinct labeled sections.
 
 ## Permission Selector
 
@@ -99,6 +110,8 @@ The custom editor lists all actions known by the capability catalog using human 
 - Publish externally (`external.publish`)
 
 Each action displays its risk level, resource scope, approval requirement, and runtime support status. An action known to the catalog but unavailable in the active runtime remains visible and disabled with an explanation. Editing any standard preset changes the selector to Custom. Plugin-contributed actions appear through the same catalog rather than through hard-coded form fields.
+
+Selected, runtime-supported actions use a green border, pale green background, and green checkbox accent so the active grant set is visible at a glance, even while a standard preset makes the checkbox read-only. Unsupported actions remain grey and disabled; unavailable capability styling takes precedence over selection styling.
 
 ## Skills and Tools
 
@@ -134,13 +147,14 @@ Employee create, revision, and projection contracts persist:
 - Work type
 - Avatar reference
 - Responsibility
+- System Prompt
 - Runtime profile
 - Model identifier
 - Explicit grants
 - Skill references
 - Tool references
 
-New fields use explicit defaults when reading older employee records. Permission presets map to the existing runtime profiles and grant actions; the saved result remains the actual runtime profile and explicit grant set, not just a decorative UI level.
+The new System Prompt column is stored with employee revision profile data. Existing revisions without a profile or with an empty System Prompt continue to run using their responsibility as the legacy instruction. Permission presets map to the existing runtime profiles and grant actions; the saved result remains the actual runtime profile and explicit grant set, not just a decorative UI level.
 
 Skill and Tool source interfaces are separate because instructions and executable capabilities have different metadata and permission needs. Their shared reference shape may be reused where it remains meaningful.
 
@@ -159,15 +173,19 @@ Skill and Tool source interfaces are separate because instructions and executabl
 Required automated coverage includes:
 
 - All six templates populate the correct editable defaults.
+- Every role template produces a non-empty, professionally structured System Prompt, while Custom produces the neutral skeleton.
 - The custom role starts without fixed profile content and uses the question-mark avatar.
+- Selecting any role card clears a previously entered nickname.
 - Hover, focus, and click paths expose equivalent role details.
 - Every permission position expands the correct explanation.
+- Selected supported permission actions expose a selected state for green visual treatment; unsupported actions remain disabled.
 - Custom permissions begin with the exact Executor set.
 - Editing a preset switches the selector to Custom.
 - Skill and Tool empty states are truthful and their provider contracts accept future test providers.
 - Model choices come from the active catalog and fallback correctly.
 - Step validation, backward navigation, retained drafts, and final submission work.
-- New API fields persist and older employee rows receive their defined defaults.
+- System Prompt persists through create and revise projections, and older employee rows retain the documented runtime fallback.
+- Runtime submissions keep System Prompt, responsibility, objective, and acceptance criteria in separate prompt sections.
 - Existing employee creation and governance behavior remains passing.
 
 ## Out of Scope

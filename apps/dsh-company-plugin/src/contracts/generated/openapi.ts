@@ -140,6 +140,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chat-executions/{execution_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Execution */
+        post: operations["retry_execution_chat_executions__execution_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/employees/{employee_id}": {
         parameters: {
             query?: never;
@@ -365,6 +382,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspace_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Messages */
+        get: operations["list_messages_workspaces__workspace_id__messages_get"];
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_workspaces__workspace_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspace_id}/templates/{plugin_id}/{template_id}/instantiate": {
         parameters: {
             query?: never;
@@ -582,6 +617,83 @@ export interface components {
              * @enum {string}
              */
             kind: "skill" | "tool";
+        };
+        /** ChatExecutionProjection */
+        ChatExecutionProjection: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Employee Id */
+            employee_id: string;
+            /** Failure Code */
+            failure_code: string | null;
+            /** Id */
+            id: string;
+            /** Message Id */
+            message_id: string;
+            /** Retry Count */
+            retry_count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ChatMessageCollection */
+        ChatMessageCollection: {
+            /** Messages */
+            messages: components["schemas"]["ChatMessageProjection"][];
+        };
+        /** ChatMessageCreate */
+        ChatMessageCreate: {
+            /** Body */
+            body: string;
+            /** Mention Employee Ids */
+            mention_employee_ids?: string[];
+            /** Work Id */
+            work_id?: string | null;
+        };
+        /** ChatMessageProjection */
+        ChatMessageProjection: {
+            /**
+             * Author Kind
+             * @enum {string}
+             */
+            author_kind: "user" | "employee" | "system";
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Employee Id */
+            employee_id: string | null;
+            /** Executions */
+            executions: components["schemas"]["ChatExecutionProjection"][];
+            /** Id */
+            id: string;
+            /** Mentions */
+            mentions: string[];
+            /**
+             * Message Kind
+             * @enum {string}
+             */
+            message_kind: "text" | "work_card" | "work_event";
+            /** Reply To Message Id */
+            reply_to_message_id: string | null;
+            work_card: components["schemas"]["WorkCardProjection"] | null;
+            /** Work Id */
+            work_id: string | null;
+            /** Workspace Id */
+            workspace_id: string;
         };
         /** CompanyEvent */
         CompanyEvent: {
@@ -1084,6 +1196,25 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** WorkCardProjection */
+        WorkCardProjection: {
+            /** Employee Ids */
+            employee_ids: string[];
+            /** Id */
+            id: string;
+            /** Objective */
+            objective: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "blocked" | "completed" | "failed" | "cancelled";
+            /**
+             * Strategy
+             * @enum {string}
+             */
+            strategy: "direct" | "star" | "graph" | "battle";
+        };
         /** WorkEdge */
         WorkEdge: {
             /** From Node Id */
@@ -1548,6 +1679,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CapabilitySourceView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_execution_chat_executions__execution_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatExecutionProjection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -2204,6 +2375,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    list_messages_workspaces__workspace_id__messages_get: {
+        parameters: {
+            query?: {
+                work_id?: string | null;
+            };
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageCollection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_workspaces__workspace_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatMessageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageProjection"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

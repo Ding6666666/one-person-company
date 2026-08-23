@@ -3,7 +3,9 @@ from typing import Annotated, Literal, cast
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
+from dsh_company.application.chat_service import ChatMessageView
 from dsh_company.application.ports import EmployeeRecord, WorkAggregate
+from dsh_company.domain.conversation import ChatExecution as DomainChatExecution
 from dsh_company.domain.work import (
     CompanyEvent as DomainCompanyEvent,
 )
@@ -41,10 +43,113 @@ DelegatedObjective = Annotated[
 DelegatedCriterion = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
 ]
+ChatBody = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+]
 
 
 class WorkspaceCreate(BaseModel):
     name: Name
+
+
+class ChatMessageCreate(BaseModel):
+    body: ChatBody
+    mention_employee_ids: list[NonBlank] = Field(default_factory=list, max_length=8)
+    work_id: NonBlank | None = None
+
+    @model_validator(mode="after")
+    def validate_mentions(self) -> "ChatMessageCreate":
+        if len(self.mention_employee_ids) != len(set(self.mention_employee_ids)):
+            raise ValueError("mention employee IDs must be unique")
+        return self
+
+
+class ChatExecutionProjection(BaseModel):
+    id: str
+    message_id: str
+    employee_id: str
+    status: Literal["queued", "running", "completed", "failed"]
+    failure_code: str | None
+    retry_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, execution: DomainChatExecution) -> "ChatExecutionProjection":
+        return cls(
+            id=execution.id,
+            message_id=execution.message_id,
+            employee_id=execution.employee_id,
+            status=execution.status.value,
+            failure_code=execution.failure_code,
+            retry_count=execution.retry_count,
+            created_at=execution.created_at,
+            updated_at=execution.updated_at,
+        )
+
+
+class ChatMessageProjection(BaseModel):
+    id: str
+    workspace_id: str
+    author_kind: Literal["user", "employee", "system"]
+    message_kind: Literal["text", "work_card", "work_event"]
+    body: str
+    employee_id: str | None
+    reply_to_message_id: str | None
+    work_id: str | None
+    created_at: datetime
+    mentions: list[str]
+    executions: list[ChatExecutionProjection]
+    work_card: "WorkCardProjection | None"
+
+    @classmethod
+    def from_record(cls, record: ChatMessageView) -> "ChatMessageProjection":
+        message = record.message
+        return cls(
+            id=message.id,
+            workspace_id=message.workspace_id,
+            author_kind=message.author_kind.value,
+            message_kind=message.message_kind.value,
+            body=message.body,
+            employee_id=message.employee_id,
+            reply_to_message_id=message.reply_to_message_id,
+            work_id=message.work_id,
+            created_at=message.created_at,
+            mentions=list(record.mention_employee_ids),
+            executions=[
+                ChatExecutionProjection.from_domain(execution)
+                for execution in record.executions
+            ],
+            work_card=(
+                None
+                if record.work_card is None
+                else WorkCardProjection(
+                    id=record.work_card.id,
+                    objective=record.work_card.objective,
+                    status=cast(
+                        Literal["queued", "running", "blocked", "completed", "failed", "cancelled"],
+                        record.work_card.status,
+                    ),
+                    strategy=cast(
+                        Literal["direct", "star", "graph", "battle"],
+                        record.work_card.strategy,
+                    ),
+                    employee_ids=list(record.work_card.employee_ids),
+                )
+            ),
+        )
+
+
+class ChatMessageCollection(BaseModel):
+    messages: list[ChatMessageProjection]
+
+
+class WorkCardProjection(BaseModel):
+    id: str
+    objective: str
+    status: Literal["queued", "running", "blocked", "completed", "failed", "cancelled"]
+    strategy: Literal["direct", "star", "graph", "battle"]
+    employee_ids: list[str]
 
 
 class GrantCreate(BaseModel):

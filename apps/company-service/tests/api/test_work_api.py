@@ -166,6 +166,73 @@ def test_create_is_idempotent_and_trims_public_inputs(
     assert coordinator.enqueued == [WorkNodeId(first["nodes"][0]["id"])]
 
 
+def test_formal_work_creation_adds_exactly_one_live_task_card(
+    client: TestClient,
+) -> None:
+    workspace, employee = _seed_employee(client)
+
+    first = _create_work(client, workspace, employee, command_id="chat-card-1")
+    second = _create_work(client, workspace, employee, command_id="chat-card-1")
+    messages = client.get(f"/workspaces/{workspace['id']}/messages")
+
+    assert second["id"] == first["id"]
+    assert messages.status_code == 200
+    cards = [
+        message
+        for message in messages.json()["messages"]
+        if message["message_kind"] == "work_card"
+    ]
+    assert len(cards) == 1
+    assert cards[0]["work_id"] == first["id"]
+    assert cards[0]["work_card"] == {
+        "id": first["id"],
+        "objective": first["objective"],
+        "status": first["status"],
+        "strategy": first["strategy"],
+        "employee_ids": [employee["id"]],
+    }
+
+
+def test_work_discussion_projects_supported_event_exactly_once(
+    client: TestClient,
+    engine: Engine,
+) -> None:
+    workspace, employee = _seed_employee(client)
+    work = _create_work(client, workspace, employee, command_id="chat-event-1")
+    event = CompanyEvent(
+        id=CompanyEventId("company-event-chat-1"),
+        workspace_id=workspace["id"],
+        work_id=WorkId(work["id"]),
+        node_id=WorkNodeId(work["nodes"][0]["id"]),
+        attempt_id=None,
+        source_sequence=1,
+        event_type="work.completed",
+        summary="工作已完成",
+        source="runtime",
+        observed_at=datetime.now(UTC),
+    )
+    with SqlAlchemyUnitOfWork(engine) as uow:
+        uow.company_events.append(event)
+        uow.commit()
+
+    first = client.get(
+        f"/workspaces/{workspace['id']}/messages", params={"work_id": work["id"]}
+    )
+    second = client.get(
+        f"/workspaces/{workspace['id']}/messages", params={"work_id": work["id"]}
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    projected = [
+        message
+        for message in second.json()["messages"]
+        if message["message_kind"] == "work_event"
+    ]
+    assert len(projected) == 1
+    assert projected[0]["body"] == "工作已完成"
+
+
 @pytest.mark.parametrize(
     "payload",
     [

@@ -46,19 +46,24 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
-export function Dialog({ title, onClose, children, ...props }: {
+export function Dialog({ title, closeLabel, onClose, children, ...props }: {
   readonly title: string
+  readonly closeLabel?: string | undefined
   readonly onClose: () => void
   readonly children: ReactNode
+  readonly variant?: 'dialog' | 'drawer'
+  readonly initialFocus?: boolean
 } & Omit<HTMLAttributes<HTMLDivElement>, 'title'>) {
+  const { className, variant = 'dialog', initialFocus = true, ...dialogProps } = props
   const titleId = useId()
   const panel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
     const node = panel.current
-    const first = node?.querySelector<HTMLElement>(focusableSelector)
-    first?.focus()
+    const first = [...(node?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])]
+      .find(item => item.dataset.dialogClose === undefined)
+    if (initialFocus) first?.focus()
     const keydown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -83,11 +88,14 @@ export function Dialog({ title, onClose, children, ...props }: {
       document.removeEventListener('keydown', keydown)
       trigger?.focus()
     }
-  }, [onClose])
+  }, [initialFocus, onClose])
 
   return <div className={styles.backdrop}>
-    <div {...props} ref={panel} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <h2 id={titleId}>{title}</h2>
+    <div {...dialogProps} data-variant={variant} ref={panel} className={`${styles.dialog} ${variant === 'drawer' ? styles.drawer : ''} ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <header className={styles.dialogHeader}>
+        <h2 id={titleId}>{title}</h2>
+        {closeLabel !== undefined && <button type="button" className={styles.dialogClose} data-dialog-close aria-label={closeLabel} onClick={onClose}>×</button>}
+      </header>
       {children}
     </div>
   </div>

@@ -7,6 +7,55 @@ import { Button, Field } from './ui/Primitives.js'
 
 type Strategy = StrategyWorkCreate['kind']
 type EdgeKind = 'depends_on' | 'delegates_to' | 'reviews' | 'summarizes'
+type Localized = { readonly zh: string; readonly en: string }
+interface StrategyPresentation {
+  readonly key: Strategy
+  readonly name: Localized
+  readonly tag: Localized
+  readonly summary: Localized
+  readonly workflow: Localized
+  readonly suitable: Localized
+  readonly configuration: Localized
+  readonly unsuitable: Localized
+  readonly symbol: string
+}
+
+const strategyPresentations: readonly StrategyPresentation[] = [
+  {
+    key: 'direct', symbol: '→', name: { zh: '单人执行', en: 'Direct execution' }, tag: { zh: '简单直接', en: 'Clear ownership' },
+    summary: { zh: '由一名员工完整负责目标与交付。', en: 'One employee owns the objective and delivery end to end.' },
+    workflow: { zh: '一名员工独立负责，从目标执行到最终交付保持单一责任人。', en: 'One employee works independently and remains accountable from objective to final delivery.' },
+    suitable: { zh: '边界清晰、无需多人协作的单项任务', en: 'Well-scoped tasks that do not require multi-employee collaboration' },
+    configuration: { zh: '1 名负责员工', en: '1 responsible employee' },
+    unsuitable: { zh: '需要并行探索、多人审核或复杂依赖的工作', en: 'Work requiring parallel exploration, multiple reviewers, or complex dependencies' },
+  },
+  {
+    key: 'star', symbol: '✦', name: { zh: '中心协作', en: 'Coordinated team' }, tag: { zh: '并行协作', en: 'Parallel delivery' },
+    summary: { zh: '协调者拆分目标，多名员工并行完成子任务。', en: 'A coordinator delegates child objectives to parallel contributors.' },
+    workflow: { zh: '一名协调者统筹工作，并把独立子目标分配给多名执行员工。', en: 'A coordinator directs the work and assigns independent child objectives to contributors.' },
+    suitable: { zh: '可以并行拆分、但需要统一协调和收口的任务', en: 'Parallelizable work that still needs central coordination and consolidation' },
+    configuration: { zh: '1 名协调者，以及至少 1 个员工子任务', en: '1 coordinator and at least 1 employee child task' },
+    unsuitable: { zh: '子任务存在复杂先后依赖或需要多轮交叉审核的流程', en: 'Processes with complex dependencies or repeated cross-review' },
+  },
+  {
+    key: 'graph', symbol: '◇', name: { zh: '流程编排', en: 'Workflow graph' }, tag: { zh: '复杂流程', en: 'Complex workflow' },
+    summary: { zh: '用任务节点和关系表达依赖、委派、审核与汇总。', en: 'Connect task nodes through dependencies, delegation, review, and summaries.' },
+    workflow: { zh: '把工作拆成多个节点，并明确每个节点的负责人及节点之间的执行关系。', en: 'Break work into nodes, assign each owner, and define execution relationships between nodes.' },
+    suitable: { zh: '存在先后顺序、交接、审核或多阶段产出的复杂流程', en: 'Complex flows with sequencing, handoffs, reviews, or multi-stage outputs' },
+    configuration: { zh: '任务节点、负责员工，以及可选的节点关系', en: 'Task nodes, assigned employees, and optional node relationships' },
+    unsuitable: { zh: '一名员工即可直接完成，或无法提前描述流程关系的任务', en: 'Tasks one employee can finish directly or whose workflow cannot be described in advance' },
+  },
+  {
+    key: 'battle', symbol: '⇄', name: { zh: '方案竞选', en: 'Proposal battle' }, tag: { zh: '比较决策', en: 'Compare options' },
+    summary: { zh: '多名员工独立提出方案，再由另一名员工比较并汇总。', en: 'Several employees propose independently; another employee compares and synthesizes.' },
+    workflow: { zh: '2–4 名员工分别提出方案，再由一名不参赛的员工独立比较、判断并汇总。', en: 'Two to four employees propose independently, then a non-participant compares and synthesizes them.' },
+    suitable: { zh: '需要多个独立观点或候选方案的决策任务', en: 'Decisions that benefit from multiple independent viewpoints or candidate solutions' },
+    configuration: { zh: '2–4 名参赛员工，以及 1 名独立汇总员工', en: '2–4 participants and 1 independent summarizer' },
+    unsuitable: { zh: '已有明确唯一执行路径，或不需要比较多个方案的任务', en: 'Tasks with one established execution path or no need to compare alternatives' },
+  },
+] as const
+
+const localized = (value: Localized, language: 'zh' | 'en'): string => value[language]
 export interface GraphRow { key: string; employeeId: string; objective: string }
 export interface EdgeRow { fromKey: string; toKey: string; kind: EdgeKind }
 export interface StarRow { employeeId: string; objective: string }
@@ -112,7 +161,9 @@ export function StrategyComposer({ employees, pending, onCancel, onStart, t }: {
 }) {
   const active = employees.filter(employee => employee.status === 'active')
   const activeIds = new Set(active.map(employee => employee.id))
+  const language = t('cancel') === 'Cancel' ? 'en' : 'zh'
   const [strategy, setStrategy] = useState<Strategy>('direct')
+  const selectedPresentation = strategyPresentations.find(item => item.key === strategy) ?? strategyPresentations[0]!
   const [objective, setObjective] = useState('')
   const [criteriaText, setCriteriaText] = useState('')
   const [directEmployee, setDirectEmployee] = useState('')
@@ -127,6 +178,7 @@ export function StrategyComposer({ employees, pending, onCancel, onStart, t }: {
   const starErrorId = useId()
   const graphErrorId = useId()
   const edgesErrorId = useId()
+  const strategyTitleId = useId()
   const error = (key: string): string | undefined => errors[key] === undefined ? undefined : t(errors[key])
 
   const submit = async (event: FormEvent): Promise<void> => {
@@ -168,11 +220,29 @@ export function StrategyComposer({ employees, pending, onCancel, onStart, t }: {
   const updateEdge = (index: number, changes: Partial<EdgeRow>): void => setEdgeRows(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...changes } : row))
 
   return <form className={styles.composer} onSubmit={event => { void submit(event) }} noValidate>
-    <Field label={t('strategy')}>
-      <select value={strategy} onChange={event => { setStrategy(event.target.value as Strategy); setErrors({}) }}>
-        <option value="direct">Direct</option><option value="star">Star</option><option value="graph">Graph</option><option value="battle">Battle</option>
-      </select>
-    </Field>
+    <section className={styles.strategyChooser} aria-labelledby={strategyTitleId}>
+      <header className={styles.strategyIntro}>
+        <div><span>01</span><h3 id={strategyTitleId}>{language === 'zh' ? '选择工作策略' : 'Choose a work strategy'}</h3></div>
+        <p>{language === 'zh' ? '策略决定员工如何分工、协作和汇总结果。选择后可查看完整说明。' : 'The strategy determines how employees divide, coordinate, and synthesize the work.'}</p>
+      </header>
+      <div className={styles.strategyGrid}>{strategyPresentations.map(item => {
+        const selected = strategy === item.key
+        return <button key={item.key} type="button" className={styles.strategyCard} data-strategy={item.key} aria-pressed={selected} onClick={() => { setStrategy(item.key); setErrors({}) }}>
+          <span className={styles.strategyCardTop}><span className={styles.strategySymbol} aria-hidden="true">{item.symbol}</span><span className={styles.strategyTag}>{localized(item.tag, language)}</span></span>
+          <span className={styles.strategyIdentity}><small>{item.key[0]!.toUpperCase() + item.key.slice(1)}</small><strong>{localized(item.name, language)}</strong></span>
+          <span className={styles.strategySummary}>{localized(item.summary, language)}</span>
+        </button>
+      })}</div>
+      <article className={styles.strategyExplanation} data-strategy={selectedPresentation.key} aria-live="polite">
+        <header><span className={styles.strategySymbol} aria-hidden="true">{selectedPresentation.symbol}</span><div><small>{selectedPresentation.key[0]!.toUpperCase() + selectedPresentation.key.slice(1)}</small><strong>{localized(selectedPresentation.name, language)}</strong></div></header>
+        <dl className={styles.strategyDetails}>
+          <div><dt>{language === 'zh' ? '工作方式' : 'How it works'}</dt><dd>{localized(selectedPresentation.workflow, language)}</dd></div>
+          <div><dt>{language === 'zh' ? '适合' : 'Best for'}</dt><dd>{localized(selectedPresentation.suitable, language)}</dd></div>
+          <div><dt>{language === 'zh' ? '需要配置' : 'Configure'}</dt><dd>{localized(selectedPresentation.configuration, language)}</dd></div>
+          <div><dt>{language === 'zh' ? '不建议' : 'Avoid when'}</dt><dd>{localized(selectedPresentation.unsuitable, language)}</dd></div>
+        </dl>
+      </article>
+    </section>
     <Field label={t('workObjective')} error={error('objective')}><textarea maxLength={4001} value={objective} onChange={event => setObjective(event.target.value)} /></Field>
     <Field label={t('acceptanceCriteria')} error={error('criteria')}><textarea value={criteriaText} onChange={event => setCriteriaText(event.target.value)} /></Field>
     {strategy === 'direct' && <Field label={t('responsibleEmployee')} error={error('employee')}><EmployeeSelect value={directEmployee} employees={active} onChange={setDirectEmployee} t={t} /></Field>}

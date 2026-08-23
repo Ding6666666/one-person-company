@@ -15,6 +15,9 @@ CompanyEventId = NewType("CompanyEventId", str)
 ArtifactReferenceId = NewType("ArtifactReferenceId", str)
 ApprovalId = NewType("ApprovalId", str)
 DelegationId = NewType("DelegationId", str)
+ConversationId = NewType("ConversationId", str)
+MessageId = NewType("MessageId", str)
+ChatExecutionId = NewType("ChatExecutionId", str)
 
 
 def new_id(prefix: str) -> str:

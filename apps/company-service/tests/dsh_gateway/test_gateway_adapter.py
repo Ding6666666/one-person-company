@@ -7,9 +7,16 @@ from typing import Any
 import dsh_company.dsh_gateway.adapter as gateway_adapter
 import pytest
 from deepseek_harness import Notification
-from dsh_company.domain.ids import AttemptId, EmployeeId, EmployeeRevisionId
+from dsh_company.domain.ids import (
+    AttemptId,
+    ChatExecutionId,
+    EmployeeId,
+    EmployeeRevisionId,
+)
 from dsh_company.dsh_gateway.adapter import PublicSdkDshGateway
 from dsh_company.dsh_gateway.contracts import (
+    ChatContextMessage,
+    ChatGatewaySubmission,
     EmployeeRuntimeSnapshot,
     GatewayCancelResult,
     GatewaySubmission,
@@ -150,6 +157,48 @@ def make_gateway(factory: FakeHarnessFactory, tmp_path: Path) -> PublicSdkDshGat
     return gateway
 
 
+def chat_submission(*, work_context: str | None = None) -> ChatGatewaySubmission:
+    return ChatGatewaySubmission(
+        execution_id=ChatExecutionId("chat-execution-1"),
+        employee=employee_snapshot(),
+        instruction="分析首次使用路径",
+        context=(
+            ChatContextMessage(author="user", body="我们正在优化新用户体验"),
+            ChatContextMessage(author="employee", body="我会先整理关键步骤"),
+        ),
+        work_context=work_context,
+    )
+
+
+def test_submit_chat_reuses_employee_session_and_returns_final_response(
+    tmp_path: Path,
+) -> None:
+    factory = FakeHarnessFactory(final_response="首次使用路径包括创建公司、创建员工和分派工作。")
+    gateway = make_gateway(factory, tmp_path)
+
+    result = gateway.submit_chat(chat_submission())
+
+    assert factory.last_session_id == "employee-emp-1"
+    assert result.finish_reason == "completed"
+    assert result.response_text == "首次使用路径包括创建公司、创建员工和分派工作。"
+
+
+def test_submit_chat_prompt_includes_group_and_work_context(tmp_path: Path) -> None:
+    factory = FakeHarnessFactory(final_response="任务回复")
+    gateway = make_gateway(factory, tmp_path)
+
+    gateway.submit_chat(chat_submission(work_context="正式工作：优化首次体验；状态：running"))
+
+    assert factory.last_harness is not None
+    prompt = factory.last_harness.prompt
+    assert prompt is not None
+    assert "Conversation context:" in prompt
+    assert "user: 我们正在优化新用户体验" in prompt
+    assert "Work context:\n正式工作：优化首次体验；状态：running" in prompt
+    assert "Current instruction:\n分析首次使用路径" in prompt
+    assert "Acceptance criteria:" not in prompt
+
+
 def test_gateway_reuses_binding_session_and_returns_reference(tmp_path: Path) -> None:
     factory = FakeHarnessFactory()
     gateway = make_gateway(factory, tmp_path)
@@ -202,6 +251,7 @@ def test_gateway_uses_responsibility_as_legacy_system_instruction(tmp_path: Path
     gateway.submit(submission(system_prompt=""), on_event=lambda event: None)
 
     assert factory.last_harness is not None
+    assert factory.last_harness.prompt is not None
     assert factory.last_harness.prompt.startswith(
         "System instructions:\n撰写清晰、准确的发布稿\n\n"
         "Employee responsibility:\n撰写清晰、准确的发布稿\n\n"

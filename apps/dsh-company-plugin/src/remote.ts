@@ -21,6 +21,8 @@ function resolveCompanyPath(baseUrl: string, method: string, path: string): stri
     || path === '/workspaces'
     || /^\/workspaces\/[^/]+\/employees$/u.test(path)
     || /^\/workspaces\/[^/]+\/(?:works|approvals|capabilities)$/u.test(path)
+    || /^\/workspaces\/[^/]+\/messages(?:\?work_id=[^&/]+)?$/u.test(path)
+    || /^\/chat-executions\/[^/]+\/retry$/u.test(path)
     || /^\/employees\/[^/]+(?:\/revisions)?$/u.test(path)
     || /^\/works\/[^/]+(?:\/(?:events|cancel|delegations))?$/u.test(path)
     || /^\/approvals\/[^/]+\/(?:approve|reject)$/u.test(path)

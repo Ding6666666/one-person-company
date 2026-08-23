@@ -7,6 +7,9 @@ from deepseek_harness import DeepSeekHarness, Notification
 from dsh_company.domain.ids import AttemptId
 
 from .contracts import (
+    ChatGatewayResult,
+    ChatGatewaySubmission,
+    EmployeeRuntimeSnapshot,
     GatewayCancelResult,
     GatewayResult,
     GatewaySubmission,
@@ -56,6 +59,27 @@ def _prompt(submission: GatewaySubmission) -> str:
     )
 
 
+def _chat_prompt(submission: ChatGatewaySubmission) -> str:
+    system_prompt = submission.employee.system_prompt.strip() or submission.employee.responsibility
+    context = "\n".join(
+        f"{message.author}: {message.body}" for message in submission.context
+    ) or "(no earlier messages)"
+    work_context = (
+        ""
+        if submission.work_context is None
+        else f"\n\nWork context:\n{submission.work_context}"
+    )
+    return (
+        f"System instructions:\n{system_prompt}\n\n"
+        f"Employee responsibility:\n{submission.employee.responsibility}\n\n"
+        f"Conversation context:\n{context}"
+        f"{work_context}\n\n"
+        f"Current instruction:\n{submission.instruction}\n\n"
+        "Respond as this employee in the company group chat. Use only the capabilities "
+        "exposed by the active DSH runtime profile and return a concise, useful reply."
+    )
+
+
 class PublicSdkDshGateway:
     def __init__(
         self,
@@ -87,27 +111,7 @@ class PublicSdkDshGateway:
         *,
         on_event: Callable[[ProjectedDshEvent], None],
     ) -> GatewayResult:
-        runtime_profile = submission.employee.runtime_profile
-        if runtime_profile not in _RUNTIME_PROFILES:
-            raise ValueError(f"unknown DSH runtime profile: {runtime_profile}")
-        profile_path = self._cordis_root / f"{runtime_profile}.cordis.yml"
-        harness_config: dict[str, object] = {
-            "provider": self._provider,
-            "model": submission.employee.model,
-            "cwd": str(self._working_directory),
-            "session_root": str(self._session_root),
-            "cordis": str(profile_path),
-            "env": {
-                "DSH_COMPANY_SESSION_ROOT": str(self._session_root),
-                "DSH_COMPANY_WORKSPACE_ROOT": str(self._working_directory),
-            },
-            "request_timeout_seconds": self._request_timeout_seconds,
-            "shutdown_timeout_seconds": self._shutdown_timeout_seconds,
-        }
-        if self._base_url is not None:
-            harness_config["base_url"] = self._base_url
-        if self._api_key is not None:
-            harness_config["api_key"] = self._api_key
+        harness_config = self._harness_config(submission.employee)
         harness = self._supervisor.create(
             submission.attempt_id,
             lambda: self._harness_factory(**harness_config),
@@ -147,6 +151,50 @@ class PublicSdkDshGateway:
             )
         finally:
             self._supervisor.finish(submission.attempt_id, harness)
+
+    def submit_chat(self, submission: ChatGatewaySubmission) -> ChatGatewayResult:
+        harness_config = self._harness_config(submission.employee)
+        harness = self._supervisor.create(
+            submission.execution_id,
+            lambda: self._harness_factory(**harness_config),
+        )
+        try:
+            session = self._supervisor.start(
+                submission.execution_id,
+                harness,
+                lambda: harness.start_session(submission.employee.dsh_session_id),
+            )
+            result = session.run(_chat_prompt(submission))
+            return ChatGatewayResult(
+                finish_reason=result.finish_reason,
+                response_text=result.final_response.strip(),
+            )
+        finally:
+            self._supervisor.finish(submission.execution_id, harness)
+
+    def _harness_config(self, employee: EmployeeRuntimeSnapshot) -> dict[str, object]:
+        runtime_profile = employee.runtime_profile
+        if runtime_profile not in _RUNTIME_PROFILES:
+            raise ValueError(f"unknown DSH runtime profile: {runtime_profile}")
+        profile_path = self._cordis_root / f"{runtime_profile}.cordis.yml"
+        harness_config: dict[str, object] = {
+            "provider": self._provider,
+            "model": employee.model,
+            "cwd": str(self._working_directory),
+            "session_root": str(self._session_root),
+            "cordis": str(profile_path),
+            "env": {
+                "DSH_COMPANY_SESSION_ROOT": str(self._session_root),
+                "DSH_COMPANY_WORKSPACE_ROOT": str(self._working_directory),
+            },
+            "request_timeout_seconds": self._request_timeout_seconds,
+            "shutdown_timeout_seconds": self._shutdown_timeout_seconds,
+        }
+        if self._base_url is not None:
+            harness_config["base_url"] = self._base_url
+        if self._api_key is not None:
+            harness_config["api_key"] = self._api_key
+        return harness_config
 
     def cancel(self, attempt_id: AttemptId) -> GatewayCancelResult:
         return self._supervisor.cancel(attempt_id)

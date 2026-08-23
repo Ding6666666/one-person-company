@@ -2,7 +2,6 @@
 .detail {
   display: grid;
   gap: 1rem;
-  padding: 1rem;
 }
 
 .workList header,
@@ -20,11 +19,49 @@
 .detail h3 { margin: 0; }
 .workList ul,
 .history ol { display: grid; gap: 0.65rem; margin: 0; padding-left: 1.25rem; }
-.workList a { color: #174ea6; }
+.workList .workCards { gap:1rem; grid-template-columns:repeat(auto-fill,minmax(18rem,1fr)); list-style:none; margin-top:1.4rem; padding:0; }
+.workCards li { background:white; border:1px solid #e1e5f0; border-left:5px solid #8a95aa; border-radius:1rem; box-shadow:0 .55rem 1.7rem rgb(35 46 88 / 7%); min-width:0; overflow:hidden; transition:transform .18s ease,box-shadow .18s ease; }
+.workCards li:hover { box-shadow:0 1rem 2rem rgb(46 54 111 / 15%); transform:translateY(-4px); }.workCards li[data-status='running'] { border-left-color:#00b98e; }.workCards li[data-status='queued'],.workCards li[data-status='blocked'] { border-left-color:#ff8a00; }.workCards li[data-status='completed'] { border-left-color:#6c4dff; }.workCards li[data-status='failed'],.workCards li[data-status='cancelled'] { border-left-color:#ef3f98; }
+.workList a { color:#17203a; display:grid; gap:1rem; padding:1rem 1.1rem; text-decoration:none; }.workList a[aria-current='page'] { background:#f1f4ff; }.workCardTop { align-items:flex-start; display:flex; gap:1rem; justify-content:space-between; }.workCardTop strong { font-size:.92rem; line-height:1.45; }.workMeta { color:#7e899f; display:flex; font-size:.72rem; gap:1rem; justify-content:space-between; }
 .composer { display: grid; gap: 1rem; }
 .composer textarea { min-height: 5rem; resize: vertical; }
+.strategyChooser { display:grid; gap:1rem; }
+.strategyIntro { align-items:flex-end; display:flex; gap:1.5rem; justify-content:space-between; }
+.strategyIntro > div { align-items:center; display:flex; gap:.7rem; }
+.strategyIntro span { color:#2579ed; font-size:.72rem; font-weight:900; letter-spacing:.18em; }
+.strategyIntro h3 { color:#12213a; font-size:1.15rem; margin:0; }
+.strategyIntro p { color:#6c7890; font-size:.82rem; margin:0; max-width:28rem; text-align:right; }
+.strategyGrid { display:grid; gap:.8rem; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.strategyCard { background:#f8faff; border:1px solid #dde5f2; border-radius:1rem; color:#17233b; cursor:pointer; display:grid; gap:.72rem; overflow:hidden; padding:1rem; position:relative; text-align:left; transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.strategyCard::before { background:var(--strategy-accent,#2579ed); content:""; height:3px; inset:0 0 auto; opacity:.25; position:absolute; }
+.strategyCard:hover { border-color:color-mix(in srgb,var(--strategy-accent,#2579ed) 48%,#dfe6f2); box-shadow:0 .7rem 1.6rem rgb(43 60 110 / 12%); transform:translateY(-2px); }
+.strategyCard:focus-visible { outline:3px solid color-mix(in srgb,var(--strategy-accent,#2579ed) 32%,transparent); outline-offset:2px; }
+.strategyCard[aria-pressed='true'] { background:color-mix(in srgb,var(--strategy-accent,#2579ed) 7%,white); border-color:var(--strategy-accent,#2579ed); box-shadow:0 .8rem 1.8rem color-mix(in srgb,var(--strategy-accent,#2579ed) 18%,transparent); }
+.strategyCard[data-strategy='direct'] { --strategy-accent:#2579ed; }
+.strategyCard[data-strategy='star'] { --strategy-accent:#7456e8; }
+.strategyCard[data-strategy='graph'] { --strategy-accent:#00a786; }
+.strategyCard[data-strategy='battle'] { --strategy-accent:#f26a3d; }
+.strategyCardTop { align-items:center; display:flex; justify-content:space-between; }
+.strategySymbol { align-items:center; background:var(--strategy-accent); border-radius:.72rem; color:white; display:inline-flex; font-size:1.15rem; font-weight:900; height:2.35rem; justify-content:center; width:2.35rem; }
+.strategyTag { background:color-mix(in srgb,var(--strategy-accent) 11%,white); border-radius:999px; color:var(--strategy-accent); font-size:.68rem; font-weight:800; padding:.32rem .58rem; }
+.strategyIdentity { align-items:baseline; display:flex; gap:.55rem; }
+.strategyIdentity small { color:var(--strategy-accent); font-size:.7rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+.strategyIdentity strong { font-size:1.03rem; }
+.strategySummary { color:#637087; font-size:.8rem; line-height:1.55; }
+.strategyExplanation { --strategy-accent:#2579ed; background:color-mix(in srgb,var(--strategy-accent) 5%,white); border:1px solid color-mix(in srgb,var(--strategy-accent) 32%,#dce4f0); border-radius:1rem; display:grid; gap:.8rem; padding:1rem; }
+.strategyExplanation[data-strategy='star'] { --strategy-accent:#7456e8; }
+.strategyExplanation[data-strategy='graph'] { --strategy-accent:#00a786; }
+.strategyExplanation[data-strategy='battle'] { --strategy-accent:#f26a3d; }
+.strategyExplanation > header { align-items:center; display:flex; gap:.7rem; }
+.strategyExplanation > header div { display:grid; gap:.08rem; }
+.strategyExplanation > header small { color:var(--strategy-accent); font-size:.67rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+.strategyExplanation > header strong { color:#17233b; font-size:.95rem; }
+.strategyDetails { border-top:1px solid color-mix(in srgb,var(--strategy-accent) 20%,#e4e9f2); display:grid; gap:.75rem 1.2rem; grid-template-columns:repeat(2,minmax(0,1fr)); margin:0; padding-top:.8rem; }
+.strategyDetails div { display:grid; gap:.2rem; }
+.strategyDetails dt { color:var(--strategy-accent); font-size:.68rem; font-weight:900; letter-spacing:.06em; }
+.strategyDetails dd { color:#4c5870; font-size:.76rem; line-height:1.5; margin:0; }
 .actions { justify-content: flex-end; }
-.badge { background: #edf2f7; border-radius: 999px; padding: 0.2rem 0.65rem; }
+.badge { background: #edf2f7; border-radius: 999px; flex:none; font-size:.7rem; padding: 0.25rem 0.65rem; }
 .history { border-top: 1px solid #d7dee5; display: grid; gap: 0.75rem; padding-top: 1rem; }
 .history li { display: grid; gap: 0.2rem; }
 .eventType { color: #52606d; font-size: 0.8rem; }
@@ -35,3 +72,5 @@
 .graphNode { border: 1px solid #c8d1dc; border-left: 0.3rem solid #52606d; border-radius: 0.35rem; display: grid; gap: 0.35rem; padding: 0.75rem; }
 .graphNode h4,
 .graphNode p { margin: 0; }
+@media (max-width:56rem) { .strategyGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:42rem) { .workList .workCards,.strategyGrid,.strategyDetails { grid-template-columns:1fr; }.detail { padding:0; }.strategyIntro { align-items:flex-start; flex-direction:column; gap:.45rem; }.strategyIntro p { text-align:left; } }

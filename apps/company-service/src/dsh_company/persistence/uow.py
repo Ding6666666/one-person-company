@@ -4,6 +4,7 @@ from typing import Self
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from .chat_repositories import ConversationRepository
 from .governance_repositories import (
     ApprovalRepository,
     DelegationRepository,
@@ -25,6 +26,7 @@ class SqlAlchemyUnitOfWork:
     approvals: ApprovalRepository
     delegations: DelegationRepository
     business_plugins: BusinessPluginRepository
+    conversations: ConversationRepository
 
     def __init__(self, engine: Engine) -> None:
         self._session_factory = sessionmaker(engine, expire_on_commit=False)
@@ -43,6 +45,7 @@ class SqlAlchemyUnitOfWork:
         self.approvals = ApprovalRepository(self._session)
         self.delegations = DelegationRepository(self._session)
         self.business_plugins = BusinessPluginRepository(self._session)
+        self.conversations = ConversationRepository(self._session)
         return self
 
     def commit(self) -> None:

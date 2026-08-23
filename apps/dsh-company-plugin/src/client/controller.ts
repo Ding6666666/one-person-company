@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 
 import {
   ApiError,
+  type ChatMessageProjection,
   type CompanyEvent,
   type DirectWorkCreate,
   type Employee,
@@ -23,6 +24,8 @@ export interface CompanySnapshot {
   readonly selectedWorkId: string | undefined
   readonly selectedWork: WorkProjection | undefined
   readonly events: readonly CompanyEvent[]
+  readonly messages: readonly ChatMessageProjection[]
+  readonly discussionWorkId: string | undefined
 }
 
 const initialSnapshot: CompanySnapshot = {
@@ -36,6 +39,8 @@ const initialSnapshot: CompanySnapshot = {
   selectedWorkId: undefined,
   selectedWork: undefined,
   events: [],
+  messages: [],
+  discussionWorkId: undefined,
 }
 
 export class CompanyController {
@@ -44,6 +49,7 @@ export class CompanyController {
   private selectionGeneration = 0
   private workRefreshGeneration = 0
   private workListGeneration = 0
+  private chatGeneration = 0
 
   constructor(private readonly api: ProductApi) {}
 
@@ -88,6 +94,7 @@ export class CompanyController {
     const generation = ++this.selectionGeneration
     this.workListGeneration += 1
     this.workRefreshGeneration += 1
+    this.chatGeneration += 1
     this.publish({
       ...this.current,
       phase: 'loading',
@@ -98,12 +105,20 @@ export class CompanyController {
       selectedWorkId: undefined,
       selectedWork: undefined,
       events: [],
+      messages: [],
+      discussionWorkId: undefined,
       error: undefined,
     })
     try {
       const employees = await this.api.listEmployees(workspaceId)
       if (!this.isCurrentSelection(generation, workspaceId)) return
       this.publish({ ...this.current, phase: 'ready', employees, error: undefined })
+      const chatGeneration = ++this.chatGeneration
+      void this.api.listMessages(workspaceId).then(conversation => {
+        if (this.isCurrentSelection(generation, workspaceId) && chatGeneration === this.chatGeneration) {
+          this.publish({ ...this.current, messages: conversation.messages })
+        }
+      }, () => undefined)
     } catch (error) {
       if (this.isCurrentSelection(generation, workspaceId)) this.fail(error)
     }
@@ -128,6 +143,63 @@ export class CompanyController {
     } catch (error) {
       if (this.isCurrentSelection(generation, workspaceId)) this.fail(error)
       return undefined
+    }
+  }
+
+  async refreshMessages(): Promise<void> {
+    const workspaceId = this.current.selectedWorkspaceId
+    if (workspaceId === undefined) return
+    const selectionGeneration = this.selectionGeneration
+    const chatGeneration = ++this.chatGeneration
+    const workId = this.current.discussionWorkId
+    try {
+      const conversation = await this.api.listMessages(workspaceId, workId)
+      if (!this.isCurrentSelection(selectionGeneration, workspaceId) || chatGeneration !== this.chatGeneration) return
+      this.publish({ ...this.current, phase: 'ready', messages: conversation.messages, error: undefined })
+    } catch (error) {
+      if (this.isCurrentSelection(selectionGeneration, workspaceId) && chatGeneration === this.chatGeneration) this.fail(error)
+    }
+  }
+
+  async openDiscussion(workId: string): Promise<void> {
+    this.chatGeneration += 1
+    this.publish({ ...this.current, discussionWorkId: workId, messages: [], error: undefined })
+    await this.refreshMessages()
+  }
+
+  async closeDiscussion(): Promise<void> {
+    this.chatGeneration += 1
+    this.publish({ ...this.current, discussionWorkId: undefined, messages: [], error: undefined })
+    await this.refreshMessages()
+  }
+
+  async sendChatMessage(body: string, employeeIds: readonly string[]): Promise<ChatMessageProjection | undefined> {
+    const workspaceId = this.current.selectedWorkspaceId
+    if (workspaceId === undefined) return undefined
+    const generation = this.selectionGeneration
+    this.chatGeneration += 1
+    this.publish({ ...this.current, pending: true, error: undefined })
+    try {
+      const message = await this.api.sendMessage(workspaceId, {
+        body,
+        mention_employee_ids: [...employeeIds],
+        ...(this.current.discussionWorkId === undefined ? {} : { work_id: this.current.discussionWorkId }),
+      })
+      if (!this.isCurrentSelection(generation, workspaceId)) return undefined
+      this.publish({ ...this.current, phase: 'ready', pending: false, messages: [...this.current.messages, message], error: undefined })
+      return message
+    } catch (error) {
+      if (this.isCurrentSelection(generation, workspaceId)) this.fail(error)
+      return undefined
+    }
+  }
+
+  async retryChatExecution(executionId: string): Promise<void> {
+    try {
+      await this.api.retryChatExecution(executionId)
+      await this.refreshMessages()
+    } catch (error) {
+      this.fail(error)
     }
   }
 

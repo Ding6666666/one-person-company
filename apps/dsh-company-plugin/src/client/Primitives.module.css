@@ -1,8 +1,9 @@
 .button {
-  border: 1px solid #52606d;
-  border-radius: 0.5rem;
-  background: #f8fafc;
-  color: #17202a;
+  background: linear-gradient(135deg,#6c4dff,#2579ed);
+  border: 0;
+  border-radius: 0.75rem;
+  box-shadow: 0 .45rem 1.1rem rgb(78 73 220 / 18%);
+  color: white;
   cursor: pointer;
   padding: 0.55rem 0.85rem;
 }
@@ -42,6 +43,8 @@
   z-index: 1000;
 }
 
+.backdrop:has(.drawer) { align-items: stretch; justify-content: flex-end; }
+
 .dialog {
   background: white;
   border-radius: 0.75rem;
@@ -54,3 +57,35 @@
   padding: 1.5rem;
   width: min(90vw, 34rem);
 }
+
+.dialogHeader {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.dialogHeader h2 { margin: 0; }
+
+.dialogClose {
+  align-items: center;
+  background: #eef3ff;
+  border: 1px solid #d7e2f5;
+  border-radius: 999px;
+  color: #38516f;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 1.4rem;
+  height: 2.4rem;
+  justify-content: center;
+  line-height: 1;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+  width: 2.4rem;
+}
+
+.dialogClose:hover { background: #dfe9ff; color: #1559c5; transform: translateY(-1px); }
+.dialogClose:focus-visible { outline: 3px solid rgb(37 121 237 / 35%); outline-offset: 2px; }
+
+.drawer { border-radius: 1.5rem 0 0 1.5rem; height: 100%; margin: 0; max-height: 100vh; max-width: 32rem; padding: 1.75rem; width: min(92vw,32rem); }

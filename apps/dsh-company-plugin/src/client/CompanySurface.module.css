@@ -1,54 +1,34 @@
 .overlay {
-  background: #fff;
+  background: #f5f7fb;
   color: #17202a;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   inset: 0;
   pointer-events: auto;
   position: fixed;
   z-index: 900;
 }
 
-.header {
-  align-items: center;
-  border-bottom: 1px solid #d7dee5;
-  display: flex;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-}
-
-.header h1 {
-  font-size: 1.15rem;
-  margin: 0;
-}
-
 .layout {
-  display: grid;
-  grid-template-columns: minmax(13rem, 18rem) 1fr;
+  display: flex;
+  flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .content {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  background: radial-gradient(circle at 88% 8%, rgba(0,140,255,.1), transparent 25rem), radial-gradient(circle at 36% 100%, rgba(239,63,152,.06), transparent 28rem), #f5f7fb;
+  flex: 1;
   min-width: 0;
+  overflow: auto;
+  padding: clamp(22px, 3vw, 42px);
+  padding-bottom: 88px;
 }
-
-.tabs {
-  border-bottom: 1px solid #d7dee5;
-  display: flex;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-}
-
-.tabs a { color: #174ea6; }
-.tabs a[aria-current='page'] { color: #17202a; font-weight: 600; }
 
 .workLayout {
-  display: grid;
-  grid-template-columns: minmax(14rem, 20rem) 1fr;
   min-width: 0;
 }
+.workDrawer { max-width: min(46rem, 94vw); width: min(46rem, 94vw); }
 
 .dialogForm {
   display: grid;
@@ -61,7 +41,19 @@
   justify-content: flex-end;
 }
 
+.employeeDialog {
+  max-height: 92vh;
+  max-width: min(76rem, 96vw);
+  width: min(76rem, 96vw);
+}
+
+.workDialog {
+  max-height: 92vh;
+  max-width: min(72rem, 96vw);
+  width: min(72rem, 96vw);
+}
+
 @media (max-width: 42rem) {
-  .layout { grid-template-columns: 1fr; }
-  .workLayout { grid-template-columns: 1fr; }
+  .layout { display: block; }
+  .content { height: calc(100vh - 64px); padding: 22px 16px 90px; }
 }

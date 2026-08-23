@@ -5,14 +5,17 @@ from typing import Protocol, Self
 from dsh_company.business_plugins.manifest import BusinessPluginRegistration
 from dsh_company.domain.approval import Approval
 from dsh_company.domain.capabilities import CapabilityGrant
+from dsh_company.domain.conversation import ChatExecution, ChatExecutionStatus, ConversationMessage
 from dsh_company.domain.delegation import Delegation
 from dsh_company.domain.employee import Employee, EmployeeAgentBinding, EmployeeRevision
 from dsh_company.domain.ids import (
     ApprovalId,
     AttemptId,
+    ChatExecutionId,
     DelegationId,
     EmployeeId,
     EmployeeRevisionId,
+    MessageId,
     WorkGraphRevisionId,
     WorkId,
     WorkNodeId,
@@ -144,6 +147,50 @@ class CompanyEventRepository(Protocol):
     def list_for_work(self, work_id: WorkId) -> tuple[CompanyEvent, ...]: ...
 
 
+class ConversationRecord(Protocol):
+    @property
+    def message(self) -> ConversationMessage: ...
+
+    @property
+    def mention_employee_ids(self) -> tuple[EmployeeId, ...]: ...
+
+    @property
+    def executions(self) -> tuple[ChatExecution, ...]: ...
+
+
+class ChatExecutionRecord(Protocol):
+    @property
+    def execution(self) -> ChatExecution: ...
+
+    @property
+    def message(self) -> ConversationMessage: ...
+
+
+class ConversationRepository(Protocol):
+    def add(
+        self,
+        message: ConversationMessage,
+        mention_employee_ids: tuple[EmployeeId, ...],
+        executions: tuple[ChatExecution, ...],
+    ) -> None: ...
+
+    def list_for_workspace(
+        self, workspace_id: WorkspaceId, work_id: WorkId | None = None
+    ) -> tuple[ConversationRecord, ...]: ...
+
+    def get_message(self, message_id: MessageId) -> ConversationRecord | None: ...
+
+    def get_execution(
+        self, execution_id: ChatExecutionId
+    ) -> ChatExecutionRecord | None: ...
+
+    def update_execution(self, execution: ChatExecution) -> None: ...
+
+    def list_by_status(
+        self, status: ChatExecutionStatus
+    ) -> tuple[ChatExecutionRecord, ...]: ...
+
+
 class WorkspaceGrantRepository(Protocol):
     def list_for_workspace(
         self, workspace_id: WorkspaceId
@@ -204,6 +251,10 @@ class WorkCoordinator(WorkDispatchQueue, Protocol):
     def request_cancel(self, node_id: WorkNodeId) -> None: ...
 
 
+class ChatDispatchQueue(Protocol):
+    def enqueue_chat(self, execution_id: ChatExecutionId) -> None: ...
+
+
 class WorkReconciler(Protocol):
     def reconcile(self, work_id: WorkId) -> None: ...
 
@@ -238,6 +289,11 @@ class WorkUnitOfWork(UnitOfWork, Protocol):
     def company_events(self) -> CompanyEventRepository: ...
 
 
+class ChatUnitOfWork(WorkUnitOfWork, Protocol):
+    @property
+    def conversations(self) -> ConversationRepository: ...
+
+
 class GovernanceUnitOfWork(WorkUnitOfWork, Protocol):
     @property
     def workspace_grants(self) -> WorkspaceGrantRepository: ...
@@ -257,6 +313,10 @@ class GovernanceUnitOfWork(WorkUnitOfWork, Protocol):
 
 class UnitOfWorkFactory(Protocol):
     def __call__(self) -> WorkUnitOfWork: ...
+
+
+class ChatUnitOfWorkFactory(Protocol):
+    def __call__(self) -> ChatUnitOfWork: ...
 
 
 class GovernanceUnitOfWorkFactory(Protocol):

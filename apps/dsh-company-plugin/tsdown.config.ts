@@ -24,6 +24,23 @@ export default defineConfig(({ env }) => {
       },
     } : {}),
     plugins: !client ? [] : [{
+      name: 'company-image-assets',
+      resolveId(source, importer) {
+        if (!source.endsWith('.png') || importer === undefined) return null
+        const emitted = path.resolve(path.dirname(importer), source)
+        const sourceFile = existsSync(emitted)
+          ? emitted
+          : path.resolve('src', path.relative(path.resolve('lib/types'), emitted))
+        return `\0company-image:${sourceFile}`
+      },
+      async load(id) {
+        if (!id.startsWith('\0company-image:')) return null
+        const fileId = id.slice('\0company-image:'.length)
+        this.addWatchFile(fileId)
+        const source = await readFile(fileId)
+        return `export default ${JSON.stringify(`data:image/png;base64,${source.toString('base64')}`)};`
+      },
+    }, {
       name: 'company-css-modules',
       resolveId(source, importer) {
         if (!source.endsWith('.module.css')) return null

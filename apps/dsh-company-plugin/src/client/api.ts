@@ -38,6 +38,10 @@ export type CapabilitySourceView = ApiSchemas['CapabilitySourceView']
 export type CapabilityEntryView = ApiSchemas['CapabilityEntryView']
 export type CapabilityImport = ApiSchemas['CapabilityImport']
 export type RuntimeOptions = ApiSchemas['RuntimeOptions']
+export type ChatMessageCreate = ApiSchemas['ChatMessageCreate']
+export type ChatMessageProjection = ApiSchemas['ChatMessageProjection']
+export type ChatMessageCollection = ApiSchemas['ChatMessageCollection']
+export type ChatExecutionProjection = ApiSchemas['ChatExecutionProjection']
 
 const workspaceSchema: z.ZodType<Workspace> = z.object({
   id: z.string(),
@@ -58,15 +62,15 @@ const revisionSchema = z.object({
   employee_id: z.string(),
   revision_number: z.number(),
   responsibility: z.string(),
-  system_prompt: z.string(),
+  system_prompt: z.string().default(''),
   runtime_profile: z.string(),
   model: z.string(),
   created_at: z.string(),
-  role_template_key: z.string(),
-  work_type: z.string(),
-  avatar_key: z.string(),
-  skill_refs: z.array(z.string()),
-  tool_refs: z.array(z.string()),
+  role_template_key: z.string().default('custom'),
+  work_type: z.string().default('自定义工作'),
+  avatar_key: z.string().default('custom'),
+  skill_refs: z.array(z.string()).default([]),
+  tool_refs: z.array(z.string()).default([]),
 })
 const bindingSchema = z.object({
   id: z.string(),
@@ -189,6 +193,40 @@ const capabilityEntrySchema: z.ZodType<CapabilityEntryView> = z.object({
 const runtimeOptionsSchema: z.ZodType<RuntimeOptions> = z.object({
   provider: z.string(), default_model: z.string(),
 })
+const chatExecutionSchema: z.ZodType<ChatExecutionProjection> = z.object({
+  id: z.string(),
+  message_id: z.string(),
+  employee_id: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed']),
+  failure_code: z.string().nullable(),
+  retry_count: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+const workCardSchema = z.object({
+  id: z.string(),
+  objective: z.string(),
+  status: workStatusSchema,
+  strategy: z.enum(['direct', 'star', 'graph', 'battle']),
+  employee_ids: z.array(z.string()),
+})
+const chatMessageSchema: z.ZodType<ChatMessageProjection> = z.object({
+  id: z.string(),
+  workspace_id: z.string(),
+  author_kind: z.enum(['user', 'employee', 'system']),
+  message_kind: z.enum(['text', 'work_card', 'work_event']),
+  body: z.string(),
+  employee_id: z.string().nullable(),
+  reply_to_message_id: z.string().nullable(),
+  work_id: z.string().nullable(),
+  created_at: z.string(),
+  mentions: z.array(z.string()),
+  executions: z.array(chatExecutionSchema),
+  work_card: workCardSchema.nullable(),
+})
+const chatMessageCollectionSchema: z.ZodType<ChatMessageCollection> = z.object({
+  messages: z.array(chatMessageSchema),
+})
 
 export class ApiError extends Error {
   constructor(
@@ -245,6 +283,32 @@ export class ProductApi {
 
   getRuntimeOptions(): Promise<RuntimeOptions> {
     return this.request('GET', '/runtime-options', undefined, runtimeOptionsSchema)
+  }
+
+  listMessages(workspaceId: string, workId?: string): Promise<ChatMessageCollection> {
+    const base = `/workspaces/${encodeURIComponent(workspaceId)}/messages` as const
+    const path = workId === undefined
+      ? base
+      : `${base}?work_id=${encodeURIComponent(workId)}` as const
+    return this.request('GET', path, undefined, chatMessageCollectionSchema)
+  }
+
+  sendMessage(workspaceId: string, body: ChatMessageCreate): Promise<ChatMessageProjection> {
+    return this.request(
+      'POST',
+      `/workspaces/${encodeURIComponent(workspaceId)}/messages`,
+      body,
+      chatMessageSchema,
+    )
+  }
+
+  retryChatExecution(executionId: string): Promise<ChatExecutionProjection> {
+    return this.request(
+      'POST',
+      `/chat-executions/${encodeURIComponent(executionId)}/retry`,
+      undefined,
+      chatExecutionSchema,
+    )
   }
 
   listWorks(workspaceId: string): Promise<WorkProjection[]> {

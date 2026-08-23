@@ -25,9 +25,9 @@ from dsh_company.domain.work import (
     project_graph_work_status,
 )
 from dsh_company.dsh_gateway.contracts import (
-    DshGateway,
     EmployeeRuntimeSnapshot,
     GatewaySubmission,
+    WorkGateway,
 )
 from dsh_company.dsh_gateway.control_requests import ControlRequest
 from dsh_company.dsh_gateway.events import ProjectedDshEvent
@@ -65,7 +65,7 @@ class RuntimeCoordinator:
     def __init__(
         self,
         uow_factory: UnitOfWorkFactory,
-        gateway: DshGateway,
+        gateway: WorkGateway,
         *,
         governance_handler: RuntimeGovernancePort | None = None,
         terminal_observer: RuntimeTerminalObserver | None = None,

@@ -4,13 +4,15 @@ from dataclasses import dataclass, field
 from fastapi import APIRouter
 
 from dsh_company.api.capability_sources import router as capability_sources_router
+from dsh_company.api.chat import router as chat_router
 from dsh_company.api.company import router as company_router
 from dsh_company.api.governance import router as governance_router
 from dsh_company.api.plugins import router as plugins_router
 from dsh_company.api.work import router as work_router
+from dsh_company.application.chat_coordinator import ChatCoordinator
 from dsh_company.application.delegation_service import DelegationService
 from dsh_company.application.governance_service import GovernanceService
-from dsh_company.application.ports import WorkCoordinator, WorkUnitOfWork
+from dsh_company.application.ports import ChatDispatchQueue, WorkCoordinator, WorkUnitOfWork
 from dsh_company.application.runtime_coordinator import RuntimeCoordinator
 from dsh_company.application.runtime_governance import RuntimeGovernanceHandler
 from dsh_company.business_plugins.registry import BusinessPluginRegistry
@@ -18,6 +20,7 @@ from dsh_company.capability_sources.registry import CapabilitySourceRegistry
 from dsh_company.domain.ids import (
     ArtifactReferenceId,
     AttemptId,
+    ChatExecutionId,
     WorkGraphRevisionId,
     WorkId,
     WorkNodeId,
@@ -56,6 +59,12 @@ class _UnconfiguredWorkCoordinator:
     def request_cancel(self, node_id: WorkNodeId) -> None:
         del node_id
         raise RuntimeError("work coordinator is not configured")
+
+
+class _UnconfiguredChatDispatchQueue:
+    def enqueue_chat(self, execution_id: ChatExecutionId) -> None:
+        del execution_id
+        raise RuntimeError("chat coordinator is not configured")
 
 
 class _UnconfiguredOrchestrationEngine:
@@ -101,6 +110,7 @@ class _TerminalObserverProxy:
 def _company_router() -> APIRouter:
     router = APIRouter()
     router.include_router(company_router)
+    router.include_router(chat_router)
     router.include_router(capability_sources_router)
     router.include_router(work_router)
     router.include_router(governance_router)
@@ -112,6 +122,9 @@ def _company_router() -> APIRouter:
 class ComponentAssembly:
     uow_factory: Callable[[], WorkUnitOfWork] = _unconfigured_uow
     work_coordinator: WorkCoordinator = field(default_factory=_UnconfiguredWorkCoordinator)
+    chat_dispatch_queue: ChatDispatchQueue = field(
+        default_factory=_UnconfiguredChatDispatchQueue
+    )
     orchestration_engine: OrchestrationEngine = field(
         default_factory=_UnconfiguredOrchestrationEngine
     )
@@ -160,6 +173,11 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
             terminal_observer=terminal_observer,
             runtime_concurrency=settings.runtime_concurrency,
         )
+        chat_coordinator = ChatCoordinator(
+            uow_factory,
+            gateway,
+            runtime_concurrency=settings.runtime_concurrency,
+        )
         orchestration_engine = DurableGraphEngine(
             uow_factory,
             coordinator,
@@ -182,18 +200,26 @@ def create_production_assembly(settings: Settings) -> ComponentAssembly:
         engine.dispose()
         raise
 
+    def startup() -> None:
+        coordinator.start()
+        chat_coordinator.start()
+
     def dispose() -> None:
         try:
-            coordinator.shutdown(wait=True)
+            chat_coordinator.shutdown(wait=True)
         finally:
-            engine.dispose()
+            try:
+                coordinator.shutdown(wait=True)
+            finally:
+                engine.dispose()
 
     return ComponentAssembly(
         uow_factory=uow_factory,
         work_coordinator=coordinator,
+        chat_dispatch_queue=chat_coordinator,
         orchestration_engine=orchestration_engine,
         governance_service_factory=governance_service_factory,
         delegation_service_factory=delegation_service_factory,
-        startup=coordinator.start,
+        startup=startup,
         dispose=dispose,
     )
