@@ -64,7 +64,7 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "link:../../vendor/deepseek-harness/packages/client/ui-sidebar",
     "@deepseek-ai/dsh-credentials": "link:../../vendor/deepseek-harness/packages/credentials/credentials",
     "@deepseek-ai/dsh-typert-protocol": "link:../../vendor/deepseek-harness/packages/typert/protocol",
-    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@types/node": "^22.20.0",
