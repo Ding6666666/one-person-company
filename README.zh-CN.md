@@ -10,7 +10,9 @@
   </p>
 </div>
 
-![One Person Company——互相协作的 AI 员工团队](docs/assets/readme/hero.png)
+<p align="center">
+  <img src="docs/assets/readme/hero.png" alt="One Person Company——互相协作的 AI 员工团队" />
+</p>
 
 One Person Company 是一个开源的 [DeepSeek Harness（DSH）](https://github.com/deepseek-ai/deepseek-harness) 插件，用于运行持久、可治理的 AI 员工公司。你可以创建具备专业角色的员工，通过 `@` 在群聊中指挥团队，并使用 Direct、Star、Graph 或 Battle 协作策略完成工作。
 

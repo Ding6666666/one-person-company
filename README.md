@@ -10,7 +10,9 @@
   </p>
 </div>
 
-![One Person Company — a connected team of AI employees](docs/assets/readme/hero.png)
+<p align="center">
+  <img src="docs/assets/readme/hero.png" alt="One Person Company — a connected team of AI employees" />
+</p>
 
 One Person Company is an open-source [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-harness) plugin for operating a durable, governed company of AI employees. Create role-based employees, talk to the team with `@mentions`, and deliver work through Direct, Star, Graph, or Battle collaboration strategies.
 
