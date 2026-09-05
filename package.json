@@ -104,7 +104,7 @@
     "@deepseek-ai/dsh-typert-protocol": "*"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/dsh-api-remotes": "link:./vendor/deepseek-harness/packages/api/remotes",
     "@deepseek-ai/dsh-client-locale": "link:./vendor/deepseek-harness/packages/client/locale",
     "@deepseek-ai/dsh-client-runtime": "link:./vendor/deepseek-harness/packages/client/runtime",
