@@ -16,9 +16,9 @@ dsh-company-service = { workspace = true }
 [dependency-groups]
 dev = [
   "httpx==0.28.1",
-  "pyright==1.1.411",
+  "pyright==1.1.414",
   "pytest==9.1.1",
-  "ruff==0.15.4",
+  "ruff==0.16.7",
 ]
 evaluation = [
   "maseval==0.5.1",
